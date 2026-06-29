@@ -44,6 +44,8 @@ alwaysApply: true
 
 - Workflow: `.github/workflows/ci.yml`
 - Триггеры: push `feature/**`, `develop`; PR → `develop`, `main`
+- Check: `quality-gates` (required на `develop` и `main`)
+- GitHub policy: `docs/active/GITHUB_RULES.md`
 - Merge в `develop` только при green CI (+ локальные checks по `lint-ci-mandatory` skill при наличии кода)
 
 ## Auth

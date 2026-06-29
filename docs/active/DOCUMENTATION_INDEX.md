@@ -22,6 +22,7 @@
 - **VENDOR_INTEGRATION.md** — интеграция admin ↔ коробка: token, verify-code, deploy, offline-first.
 - **TODO.md** — backlog MVP admin и чеклист интеграции с ESC-Promo.
 - **GIT_WORKFLOW.md** — ветки feature → develop → main, CI, PR.
+- **GITHUB_RULES.md** — branch protection, default branch, PR template, CI checks.
 
 ---
 

@@ -29,7 +29,7 @@ alwaysApply: true
 
 `<тип>: <описание>` — типы: feat, fix, docs, refactor, test, chore, ci, build.  
 Работа — в `feature/*` от `develop`; merge в `develop` после CI; `main` — только production.  
-Подробно: `docs/active/GIT_WORKFLOW.md`, `.cursor/rules/git-workflow.mdc`.
+Подробно: `docs/active/GIT_WORKFLOW.md`, `docs/active/GITHUB_RULES.md`, `.cursor/rules/git-workflow.mdc`.
 
 ## После чанка генерации
 

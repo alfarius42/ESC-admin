@@ -54,6 +54,7 @@
 
 - **`docs/active/DOCUMENTATION_INDEX.md`** — полный индекс.
 - **`docs/active/GIT_WORKFLOW.md`** — feature → develop → main, CI, PR.
+- **`docs/active/GITHUB_RULES.md`** — branch protection, default branch, PR policy.
 - **`.cursor/rules/development-process.mdc`** — docs-first, формат коммитов.
 - **`.cursor/rules/git-workflow.mdc`** — ветки и merge policy.
 
