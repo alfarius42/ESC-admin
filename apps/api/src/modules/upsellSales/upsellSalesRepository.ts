@@ -1,7 +1,16 @@
 import { randomUUID } from "node:crypto";
-import type { RowDataPacket } from "mysql2";
-import { getDbPool } from "../../db/client.js";
+import { and, desc, eq, like, or, sql, type SQL } from "drizzle-orm";
+import { getDrizzleDb } from "../../db/client.js";
+import { customers, upsellSales } from "../../db/schema.js";
 import { formatRubDecimal } from "../../utils/salesFormat.js";
+
+type UpsellSkuCategory =
+  | "license_upgrade"
+  | "deploy"
+  | "dev"
+  | "support"
+  | "legal"
+  | "other";
 
 export type UpsellSaleRecord = {
   id: string;
@@ -28,43 +37,51 @@ export type UpsellSaleListItem = UpsellSaleRecord & {
   };
 };
 
-type UpsellSaleRow = RowDataPacket & {
+type UpsellSaleRow = {
   id: string;
-  customer_id: string;
-  instance_id: string | null;
+  customerId: string;
+  instanceId: string | null;
   sku: string;
-  sku_category: string;
+  skuCategory: string;
   title: string;
-  list_price_rub: string | number;
-  sold_price_rub: string | number;
-  sold_at: Date;
-  contract_ref: string | null;
-  sales_user_id: string;
-  linked_box_sale_id: string | null;
+  listPriceRub: string | number;
+  soldPriceRub: string | number;
+  soldAt: Date | string;
+  contractRef: string | null;
+  salesUserId: string;
+  linkedBoxSaleId: string | null;
   notes: string | null;
-  created_at: Date;
-  updated_at: Date;
-  legal_name?: string;
-  inn?: string | null;
+  createdAt: Date | string;
+  updatedAt: Date | string;
+  legalName: string;
+  inn: string | null;
 };
+
+function toIsoDate(value: Date | string): string {
+  return value instanceof Date ? value.toISOString().slice(0, 10) : String(value).slice(0, 10);
+}
+
+function toIsoTimestamp(value: Date | string): string {
+  return value instanceof Date ? value.toISOString() : new Date(value).toISOString();
+}
 
 function mapRow(row: UpsellSaleRow): UpsellSaleRecord {
   return {
     id: row.id,
-    customerId: row.customer_id,
-    instanceId: row.instance_id,
+    customerId: row.customerId,
+    instanceId: row.instanceId,
     sku: row.sku,
-    skuCategory: row.sku_category,
+    skuCategory: row.skuCategory,
     title: row.title,
-    listPriceRub: formatRubDecimal(row.list_price_rub),
-    soldPriceRub: formatRubDecimal(row.sold_price_rub),
-    soldAt: row.sold_at.toISOString().slice(0, 10),
-    contractRef: row.contract_ref,
-    salesUserId: row.sales_user_id,
-    linkedBoxSaleId: row.linked_box_sale_id,
+    listPriceRub: formatRubDecimal(row.listPriceRub),
+    soldPriceRub: formatRubDecimal(row.soldPriceRub),
+    soldAt: toIsoDate(row.soldAt),
+    contractRef: row.contractRef,
+    salesUserId: row.salesUserId,
+    linkedBoxSaleId: row.linkedBoxSaleId,
     notes: row.notes,
-    createdAt: row.created_at.toISOString(),
-    updatedAt: row.updated_at.toISOString()
+    createdAt: toIsoTimestamp(row.createdAt),
+    updatedAt: toIsoTimestamp(row.updatedAt)
   };
 }
 
@@ -72,7 +89,7 @@ function mapListRow(row: UpsellSaleRow): UpsellSaleListItem {
   return {
     ...mapRow(row),
     customer: {
-      legalName: row.legal_name ?? "",
+      legalName: row.legalName,
       inn: row.inn ?? null
     }
   };
@@ -86,52 +103,45 @@ function buildListConditions(params: {
   skuCategory?: string;
   from?: string;
   to?: string;
-}): { whereClause: string; values: string[] } {
-  const conditions: string[] = [];
-  const values: string[] = [];
+}): SQL<unknown>[] {
+  const conditions: SQL<unknown>[] = [];
 
   if (params.customerId?.trim()) {
-    conditions.push("us.customer_id = ?");
-    values.push(params.customerId.trim());
+    conditions.push(eq(upsellSales.customerId, params.customerId.trim()));
   }
 
   if (params.instanceId?.trim()) {
-    conditions.push("us.instance_id = ?");
-    values.push(params.instanceId.trim());
+    conditions.push(eq(upsellSales.instanceId, params.instanceId.trim()));
   }
 
   if (params.sku?.trim()) {
-    conditions.push("us.sku = ?");
-    values.push(params.sku.trim());
+    conditions.push(eq(upsellSales.sku, params.sku.trim()));
   }
 
   if (params.skuCategory?.trim()) {
-    conditions.push("us.sku_category = ?");
-    values.push(params.skuCategory.trim());
+    conditions.push(eq(upsellSales.skuCategory, params.skuCategory.trim() as UpsellSkuCategory));
   }
 
   if (params.from?.trim()) {
-    conditions.push("us.sold_at >= ?");
-    values.push(params.from.trim());
+    conditions.push(sql`${upsellSales.soldAt} >= DATE(${params.from.trim()})`);
   }
 
   if (params.to?.trim()) {
-    conditions.push("us.sold_at <= ?");
-    values.push(params.to.trim());
+    conditions.push(sql`${upsellSales.soldAt} <= DATE(${params.to.trim()})`);
   }
 
   if (params.q?.trim()) {
     const term = `%${params.q.trim()}%`;
     conditions.push(
-      "(c.legal_name LIKE ? OR c.inn LIKE ? OR us.sku LIKE ? OR us.title LIKE ?)"
+      or(
+        like(customers.legalName, term),
+        like(customers.inn, term),
+        like(upsellSales.sku, term),
+        like(upsellSales.title, term)
+      )!
     );
-    values.push(term, term, term, term);
   }
-
-  const whereClause =
-    conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
-
-  return { whereClause, values };
+  return conditions;
 }
 
 export async function listUpsellSales(params: {
@@ -145,30 +155,43 @@ export async function listUpsellSales(params: {
   offset: number;
   limit: number;
 }): Promise<{ items: UpsellSaleListItem[]; total: number }> {
-  const db = getDbPool();
-  const { whereClause, values } = buildListConditions(params);
+  const db = getDrizzleDb();
+  const conditions = buildListConditions(params);
+  const whereExpr = conditions.length > 0 ? and(...conditions) : undefined;
 
-  const [countRows] = await db.execute<RowDataPacket[]>(
-    `SELECT COUNT(*) AS total
-     FROM upsell_sales us
-     INNER JOIN customers c ON c.id = us.customer_id
-     ${whereClause}`,
-    values
-  );
+  const countRows = await db
+    .select({ total: sql<number>`count(*)` })
+    .from(upsellSales)
+    .innerJoin(customers, eq(customers.id, upsellSales.customerId))
+    .where(whereExpr);
   const total = Number(countRows[0]?.total ?? 0);
 
-  const [rows] = await db.execute<UpsellSaleRow[]>(
-    `SELECT us.id, us.customer_id, us.instance_id, us.sku, us.sku_category, us.title,
-            us.list_price_rub, us.sold_price_rub, us.sold_at, us.contract_ref,
-            us.sales_user_id, us.linked_box_sale_id, us.notes, us.created_at, us.updated_at,
-            c.legal_name, c.inn
-     FROM upsell_sales us
-     INNER JOIN customers c ON c.id = us.customer_id
-     ${whereClause}
-     ORDER BY us.sold_at DESC, us.created_at DESC
-     LIMIT ? OFFSET ?`,
-    [...values, String(params.limit), String(params.offset)]
-  );
+  const rows = await db
+    .select({
+      id: upsellSales.id,
+      customerId: upsellSales.customerId,
+      instanceId: upsellSales.instanceId,
+      sku: upsellSales.sku,
+      skuCategory: upsellSales.skuCategory,
+      title: upsellSales.title,
+      listPriceRub: upsellSales.listPriceRub,
+      soldPriceRub: upsellSales.soldPriceRub,
+      soldAt: upsellSales.soldAt,
+      contractRef: upsellSales.contractRef,
+      salesUserId: upsellSales.salesUserId,
+      linkedBoxSaleId: upsellSales.linkedBoxSaleId,
+      notes: upsellSales.notes,
+      createdAt: upsellSales.createdAt,
+      updatedAt: upsellSales.updatedAt,
+      legalName: customers.legalName,
+      inn: customers.inn
+    })
+    .from(upsellSales)
+    .innerJoin(customers, eq(customers.id, upsellSales.customerId))
+    .where(whereExpr)
+    .orderBy(desc(upsellSales.soldAt), desc(upsellSales.createdAt))
+    .limit(params.limit)
+    .offset(params.offset);
 
   return { items: rows.map(mapListRow), total };
 }
@@ -176,18 +199,31 @@ export async function listUpsellSales(params: {
 export async function findUpsellSaleById(
   id: string
 ): Promise<UpsellSaleListItem | null> {
-  const db = getDbPool();
-  const [rows] = await db.execute<UpsellSaleRow[]>(
-    `SELECT us.id, us.customer_id, us.instance_id, us.sku, us.sku_category, us.title,
-            us.list_price_rub, us.sold_price_rub, us.sold_at, us.contract_ref,
-            us.sales_user_id, us.linked_box_sale_id, us.notes, us.created_at, us.updated_at,
-            c.legal_name, c.inn
-     FROM upsell_sales us
-     INNER JOIN customers c ON c.id = us.customer_id
-     WHERE us.id = ?
-     LIMIT 1`,
-    [id]
-  );
+  const db = getDrizzleDb();
+  const rows = await db
+    .select({
+      id: upsellSales.id,
+      customerId: upsellSales.customerId,
+      instanceId: upsellSales.instanceId,
+      sku: upsellSales.sku,
+      skuCategory: upsellSales.skuCategory,
+      title: upsellSales.title,
+      listPriceRub: upsellSales.listPriceRub,
+      soldPriceRub: upsellSales.soldPriceRub,
+      soldAt: upsellSales.soldAt,
+      contractRef: upsellSales.contractRef,
+      salesUserId: upsellSales.salesUserId,
+      linkedBoxSaleId: upsellSales.linkedBoxSaleId,
+      notes: upsellSales.notes,
+      createdAt: upsellSales.createdAt,
+      updatedAt: upsellSales.updatedAt,
+      legalName: customers.legalName,
+      inn: customers.inn
+    })
+    .from(upsellSales)
+    .innerJoin(customers, eq(customers.id, upsellSales.customerId))
+    .where(eq(upsellSales.id, id))
+    .limit(1);
 
   if (rows.length === 0) {
     return null;
@@ -210,31 +246,26 @@ export async function createUpsellSale(data: {
   linkedBoxSaleId: string | null;
   notes: string | null;
 }): Promise<UpsellSaleListItem> {
-  const db = getDbPool();
+  const db = getDrizzleDb();
   const id = randomUUID();
 
-  await db.execute(
-    `INSERT INTO upsell_sales (
-       id, customer_id, instance_id, sku, sku_category, title,
-       list_price_rub, sold_price_rub, sold_at, contract_ref,
-       sales_user_id, linked_box_sale_id, notes
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [
-      id,
-      data.customerId,
-      data.instanceId,
-      data.sku,
-      data.skuCategory,
-      data.title,
-      data.listPriceRub,
-      data.soldPriceRub,
-      data.soldAt,
-      data.contractRef,
-      data.salesUserId,
-      data.linkedBoxSaleId,
-      data.notes
-    ]
-  );
+  await db.insert(upsellSales).values({
+    id,
+    customerId: data.customerId,
+    instanceId: data.instanceId,
+    sku: data.sku,
+    skuCategory: data.skuCategory as UpsellSkuCategory,
+    title: data.title,
+    listPriceRub: data.listPriceRub,
+    soldPriceRub: data.soldPriceRub,
+    soldAt: sql`DATE(${data.soldAt})`,
+    contractRef: data.contractRef,
+    salesUserId: data.salesUserId,
+    linkedBoxSaleId: data.linkedBoxSaleId,
+    notes: data.notes,
+    createdAt: sql`UTC_TIMESTAMP()`,
+    updatedAt: sql`UTC_TIMESTAMP()`
+  });
 
   const created = await findUpsellSaleById(id);
   if (!created) {
@@ -260,28 +291,20 @@ export async function updateUpsellSale(
     return null;
   }
 
-  const db = getDbPool();
-  await db.execute(
-    `UPDATE upsell_sales SET
-       instance_id = ?,
-       sold_price_rub = ?,
-       sold_at = ?,
-       contract_ref = ?,
-       linked_box_sale_id = ?,
-       notes = ?
-     WHERE id = ?`,
-    [
-      data.instanceId !== undefined ? data.instanceId : existing.instanceId,
-      data.soldPriceRub ?? existing.soldPriceRub,
-      data.soldAt ?? existing.soldAt,
-      data.contractRef !== undefined ? data.contractRef : existing.contractRef,
-      data.linkedBoxSaleId !== undefined
-        ? data.linkedBoxSaleId
-        : existing.linkedBoxSaleId,
-      data.notes !== undefined ? data.notes : existing.notes,
-      id
-    ]
-  );
+  const db = getDrizzleDb();
+  await db
+    .update(upsellSales)
+    .set({
+      instanceId: data.instanceId !== undefined ? data.instanceId : existing.instanceId,
+      soldPriceRub: data.soldPriceRub ?? existing.soldPriceRub,
+      soldAt: sql`DATE(${data.soldAt ?? existing.soldAt})`,
+      contractRef: data.contractRef !== undefined ? data.contractRef : existing.contractRef,
+      linkedBoxSaleId:
+        data.linkedBoxSaleId !== undefined ? data.linkedBoxSaleId : existing.linkedBoxSaleId,
+      notes: data.notes !== undefined ? data.notes : existing.notes,
+      updatedAt: sql`UTC_TIMESTAMP()`
+    })
+    .where(eq(upsellSales.id, id));
 
   return findUpsellSaleById(id);
 }
@@ -295,43 +318,45 @@ export async function getUpsellSalesStats(params: {
   byCategory: Array<{ skuCategory: string; count: number; revenueRub: string }>;
   bySku: Array<{ sku: string; count: number; revenueRub: string }>;
 }> {
-  const db = getDbPool();
-  const { whereClause, values } = buildListConditions(params);
+  const db = getDrizzleDb();
+  const conditions = buildListConditions(params);
+  const whereExpr = conditions.length > 0 ? and(...conditions) : undefined;
 
-  const [totalRows] = await db.execute<RowDataPacket[]>(
-    `SELECT COUNT(*) AS totalCount, COALESCE(SUM(us.sold_price_rub), 0) AS revenueRub
-     FROM upsell_sales us
-     INNER JOIN customers c ON c.id = us.customer_id
-     ${whereClause}`,
-    values
-  );
+  const totalRows = await db
+    .select({
+      totalCount: sql<number>`count(*)`,
+      revenueRub: sql<number | string>`coalesce(sum(${upsellSales.soldPriceRub}), 0)`
+    })
+    .from(upsellSales)
+    .innerJoin(customers, eq(customers.id, upsellSales.customerId))
+    .where(whereExpr);
 
   const totalCount = Number(totalRows[0]?.totalCount ?? 0);
   const revenueRub = formatRubDecimal(totalRows[0]?.revenueRub ?? 0);
 
-  const [categoryRows] = await db.execute<RowDataPacket[]>(
-    `SELECT us.sku_category AS skuCategory,
-            COUNT(*) AS count,
-            COALESCE(SUM(us.sold_price_rub), 0) AS revenueRub
-     FROM upsell_sales us
-     INNER JOIN customers c ON c.id = us.customer_id
-     ${whereClause}
-     GROUP BY us.sku_category
-     ORDER BY us.sku_category ASC`,
-    values
-  );
+  const categoryRows = await db
+    .select({
+      skuCategory: upsellSales.skuCategory,
+      count: sql<number>`count(*)`,
+      revenueRub: sql<number | string>`coalesce(sum(${upsellSales.soldPriceRub}), 0)`
+    })
+    .from(upsellSales)
+    .innerJoin(customers, eq(customers.id, upsellSales.customerId))
+    .where(whereExpr)
+    .groupBy(upsellSales.skuCategory)
+    .orderBy(upsellSales.skuCategory);
 
-  const [skuRows] = await db.execute<RowDataPacket[]>(
-    `SELECT us.sku,
-            COUNT(*) AS count,
-            COALESCE(SUM(us.sold_price_rub), 0) AS revenueRub
-     FROM upsell_sales us
-     INNER JOIN customers c ON c.id = us.customer_id
-     ${whereClause}
-     GROUP BY us.sku
-     ORDER BY us.sku ASC`,
-    values
-  );
+  const skuRows = await db
+    .select({
+      sku: upsellSales.sku,
+      count: sql<number>`count(*)`,
+      revenueRub: sql<number | string>`coalesce(sum(${upsellSales.soldPriceRub}), 0)`
+    })
+    .from(upsellSales)
+    .innerJoin(customers, eq(customers.id, upsellSales.customerId))
+    .where(whereExpr)
+    .groupBy(upsellSales.sku)
+    .orderBy(upsellSales.sku);
 
   return {
     totalCount,

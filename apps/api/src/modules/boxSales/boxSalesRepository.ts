@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
-import type { RowDataPacket } from "mysql2";
-import { getDbPool, withTransaction } from "../../db/client.js";
+import { and, desc, eq, like, or, sql, type SQL } from "drizzle-orm";
+import { getDrizzleDb } from "../../db/client.js";
+import { boxSales, customers, instances } from "../../db/schema.js";
 import { buildPendingTokenHash } from "../instances/integrationToken.js";
 import { formatRubDecimal } from "../../utils/salesFormat.js";
 
@@ -28,51 +29,62 @@ export type BoxSaleListItem = BoxSaleRecord & {
   };
 };
 
-type BoxSaleRow = RowDataPacket & {
+type BoxSaleRow = {
   id: string;
-  customer_id: string;
-  instance_id: string | null;
-  license_id: string | null;
-  package_sku: string;
-  modules: string | Buffer;
-  list_price_rub: string | number;
-  sold_price_rub: string | number;
-  sold_at: Date;
-  contract_ref: string | null;
-  sales_user_id: string;
+  customerId: string;
+  instanceId: string | null;
+  licenseId: string | null;
+  packageSku: string;
+  modules: unknown;
+  listPriceRub: string | number;
+  soldPriceRub: string | number;
+  soldAt: Date | string;
+  contractRef: string | null;
+  salesUserId: string;
   notes: string | null;
-  created_at: Date;
-  updated_at: Date;
-  legal_name?: string;
-  inn?: string | null;
+  createdAt: Date | string;
+  updatedAt: Date | string;
+  legalName: string;
+  inn: string | null;
 };
 
-function parseModules(value: string | Buffer): string[] {
+function parseModules(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.filter((item): item is string => typeof item === "string");
+  }
   if (Buffer.isBuffer(value)) {
-    return JSON.parse(value.toString()) as string[];
+    return JSON.parse(value.toString()) as unknown as string[];
   }
   if (typeof value === "string") {
-    return JSON.parse(value) as string[];
+    return JSON.parse(value) as unknown as string[];
   }
   return [];
+}
+
+function toIsoDate(value: Date | string): string {
+  return value instanceof Date ? value.toISOString().slice(0, 10) : String(value).slice(0, 10);
+}
+
+function toIsoTimestamp(value: Date | string): string {
+  return value instanceof Date ? value.toISOString() : new Date(value).toISOString();
 }
 
 function mapRow(row: BoxSaleRow): BoxSaleRecord {
   return {
     id: row.id,
-    customerId: row.customer_id,
-    instanceId: row.instance_id,
-    licenseId: row.license_id,
-    packageSku: row.package_sku,
+    customerId: row.customerId,
+    instanceId: row.instanceId,
+    licenseId: row.licenseId,
+    packageSku: row.packageSku,
     modules: parseModules(row.modules),
-    listPriceRub: formatRubDecimal(row.list_price_rub),
-    soldPriceRub: formatRubDecimal(row.sold_price_rub),
-    soldAt: row.sold_at.toISOString().slice(0, 10),
-    contractRef: row.contract_ref,
-    salesUserId: row.sales_user_id,
+    listPriceRub: formatRubDecimal(row.listPriceRub),
+    soldPriceRub: formatRubDecimal(row.soldPriceRub),
+    soldAt: toIsoDate(row.soldAt),
+    contractRef: row.contractRef,
+    salesUserId: row.salesUserId,
     notes: row.notes,
-    createdAt: row.created_at.toISOString(),
-    updatedAt: row.updated_at.toISOString()
+    createdAt: toIsoTimestamp(row.createdAt),
+    updatedAt: toIsoTimestamp(row.updatedAt)
   };
 }
 
@@ -80,7 +92,7 @@ function mapListRow(row: BoxSaleRow): BoxSaleListItem {
   return {
     ...mapRow(row),
     customer: {
-      legalName: row.legal_name ?? "",
+      legalName: row.legalName,
       inn: row.inn ?? null
     }
   };
@@ -93,47 +105,41 @@ function buildListConditions(params: {
   packageSku?: string;
   from?: string;
   to?: string;
-}): { whereClause: string; values: string[] } {
-  const conditions: string[] = [];
-  const values: string[] = [];
+}): SQL<unknown>[] {
+  const conditions: SQL<unknown>[] = [];
 
   if (params.customerId?.trim()) {
-    conditions.push("bs.customer_id = ?");
-    values.push(params.customerId.trim());
+    conditions.push(eq(boxSales.customerId, params.customerId.trim()));
   }
 
   if (params.instanceId?.trim()) {
-    conditions.push("bs.instance_id = ?");
-    values.push(params.instanceId.trim());
+    conditions.push(eq(boxSales.instanceId, params.instanceId.trim()));
   }
 
   if (params.packageSku?.trim()) {
-    conditions.push("bs.package_sku = ?");
-    values.push(params.packageSku.trim());
+    conditions.push(eq(boxSales.packageSku, params.packageSku.trim()));
   }
 
   if (params.from?.trim()) {
-    conditions.push("bs.sold_at >= ?");
-    values.push(params.from.trim());
+    conditions.push(sql`${boxSales.soldAt} >= DATE(${params.from.trim()})`);
   }
 
   if (params.to?.trim()) {
-    conditions.push("bs.sold_at <= ?");
-    values.push(params.to.trim());
+    conditions.push(sql`${boxSales.soldAt} <= DATE(${params.to.trim()})`);
   }
 
   if (params.q?.trim()) {
     const term = `%${params.q.trim()}%`;
     conditions.push(
-      "(c.legal_name LIKE ? OR c.inn LIKE ? OR bs.package_sku LIKE ? OR bs.contract_ref LIKE ?)"
+      or(
+        like(customers.legalName, term),
+        like(customers.inn, term),
+        like(boxSales.packageSku, term),
+        like(boxSales.contractRef, term)
+      )!
     );
-    values.push(term, term, term, term);
   }
-
-  const whereClause =
-    conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
-
-  return { whereClause, values };
+  return conditions;
 }
 
 export async function listBoxSales(params: {
@@ -146,47 +152,71 @@ export async function listBoxSales(params: {
   offset: number;
   limit: number;
 }): Promise<{ items: BoxSaleListItem[]; total: number }> {
-  const db = getDbPool();
-  const { whereClause, values } = buildListConditions(params);
+  const db = getDrizzleDb();
+  const conditions = buildListConditions(params);
+  const whereExpr = conditions.length > 0 ? and(...conditions) : undefined;
 
-  const [countRows] = await db.execute<RowDataPacket[]>(
-    `SELECT COUNT(*) AS total
-     FROM box_sales bs
-     INNER JOIN customers c ON c.id = bs.customer_id
-     ${whereClause}`,
-    values
-  );
+  const countRows = await db
+    .select({ total: sql<number>`count(*)` })
+    .from(boxSales)
+    .innerJoin(customers, eq(customers.id, boxSales.customerId))
+    .where(whereExpr);
   const total = Number(countRows[0]?.total ?? 0);
 
-  const [rows] = await db.execute<BoxSaleRow[]>(
-    `SELECT bs.id, bs.customer_id, bs.instance_id, bs.license_id, bs.package_sku,
-            bs.modules, bs.list_price_rub, bs.sold_price_rub, bs.sold_at,
-            bs.contract_ref, bs.sales_user_id, bs.notes, bs.created_at, bs.updated_at,
-            c.legal_name, c.inn
-     FROM box_sales bs
-     INNER JOIN customers c ON c.id = bs.customer_id
-     ${whereClause}
-     ORDER BY bs.sold_at DESC, bs.created_at DESC
-     LIMIT ? OFFSET ?`,
-    [...values, String(params.limit), String(params.offset)]
-  );
+  const rows = await db
+    .select({
+      id: boxSales.id,
+      customerId: boxSales.customerId,
+      instanceId: boxSales.instanceId,
+      licenseId: boxSales.licenseId,
+      packageSku: boxSales.packageSku,
+      modules: boxSales.modules,
+      listPriceRub: boxSales.listPriceRub,
+      soldPriceRub: boxSales.soldPriceRub,
+      soldAt: boxSales.soldAt,
+      contractRef: boxSales.contractRef,
+      salesUserId: boxSales.salesUserId,
+      notes: boxSales.notes,
+      createdAt: boxSales.createdAt,
+      updatedAt: boxSales.updatedAt,
+      legalName: customers.legalName,
+      inn: customers.inn
+    })
+    .from(boxSales)
+    .innerJoin(customers, eq(customers.id, boxSales.customerId))
+    .where(whereExpr)
+    .orderBy(desc(boxSales.soldAt), desc(boxSales.createdAt))
+    .limit(params.limit)
+    .offset(params.offset);
 
   return { items: rows.map(mapListRow), total };
 }
 
 export async function findBoxSaleById(id: string): Promise<BoxSaleListItem | null> {
-  const db = getDbPool();
-  const [rows] = await db.execute<BoxSaleRow[]>(
-    `SELECT bs.id, bs.customer_id, bs.instance_id, bs.license_id, bs.package_sku,
-            bs.modules, bs.list_price_rub, bs.sold_price_rub, bs.sold_at,
-            bs.contract_ref, bs.sales_user_id, bs.notes, bs.created_at, bs.updated_at,
-            c.legal_name, c.inn
-     FROM box_sales bs
-     INNER JOIN customers c ON c.id = bs.customer_id
-     WHERE bs.id = ?
-     LIMIT 1`,
-    [id]
-  );
+  const db = getDrizzleDb();
+  const rows = await db
+    .select({
+      id: boxSales.id,
+      customerId: boxSales.customerId,
+      instanceId: boxSales.instanceId,
+      licenseId: boxSales.licenseId,
+      packageSku: boxSales.packageSku,
+      modules: boxSales.modules,
+      listPriceRub: boxSales.listPriceRub,
+      soldPriceRub: boxSales.soldPriceRub,
+      soldAt: boxSales.soldAt,
+      contractRef: boxSales.contractRef,
+      salesUserId: boxSales.salesUserId,
+      notes: boxSales.notes,
+      createdAt: boxSales.createdAt,
+      updatedAt: boxSales.updatedAt,
+      legalName: customers.legalName,
+      inn: customers.inn
+    })
+    .from(boxSales)
+    .innerJoin(customers, eq(customers.id, boxSales.customerId))
+    .where(eq(boxSales.id, id))
+    .limit(1);
 
   if (rows.length === 0) {
     return null;
@@ -208,29 +238,25 @@ export async function createBoxSale(data: {
   salesUserId: string;
   notes: string | null;
 }): Promise<BoxSaleListItem> {
-  const db = getDbPool();
+  const db = getDrizzleDb();
   const id = randomUUID();
 
-  await db.execute(
-    `INSERT INTO box_sales (
-       id, customer_id, instance_id, license_id, package_sku, modules,
-       list_price_rub, sold_price_rub, sold_at, contract_ref, sales_user_id, notes
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [
-      id,
-      data.customerId,
-      data.instanceId,
-      data.licenseId,
-      data.packageSku,
-      JSON.stringify(data.modules),
-      data.listPriceRub,
-      data.soldPriceRub,
-      data.soldAt,
-      data.contractRef,
-      data.salesUserId,
-      data.notes
-    ]
-  );
+  await db.insert(boxSales).values({
+    id,
+    customerId: data.customerId,
+    instanceId: data.instanceId,
+    licenseId: data.licenseId,
+    packageSku: data.packageSku,
+    modules: data.modules,
+    listPriceRub: data.listPriceRub,
+    soldPriceRub: data.soldPriceRub,
+    soldAt: sql`DATE(${data.soldAt})`,
+    contractRef: data.contractRef,
+    salesUserId: data.salesUserId,
+    notes: data.notes,
+    createdAt: sql`UTC_TIMESTAMP()`,
+    updatedAt: sql`UTC_TIMESTAMP()`
+  });
 
   const created = await findBoxSaleById(id);
   if (!created) {
@@ -252,57 +278,64 @@ export async function createBoxSaleWithNewInstance(data: {
   salesUserId: string;
   notes: string | null;
 }): Promise<BoxSaleListItem> {
-  return withTransaction(async (connection) => {
+  const db = getDrizzleDb();
+  return db.transaction(async (tx) => {
     const instanceId = randomUUID();
     const saleId = randomUUID();
 
-    await connection.execute(
-      `INSERT INTO instances (
-         id, customer_id, hostname, deploy_url, integration_token_hash, instance_status, notes
-       ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [
-        instanceId,
-        data.customerId,
-        null,
-        null,
-        buildPendingTokenHash(instanceId),
-        "planned",
-        null
-      ]
-    );
+    await tx.insert(instances).values({
+      id: instanceId,
+      customerId: data.customerId,
+      hostname: null,
+      deployUrl: null,
+      integrationTokenHash: buildPendingTokenHash(instanceId),
+      integrationTokenIssuedAt: sql`UTC_TIMESTAMP()`,
+      instanceStatus: "planned",
+      notes: null,
+      createdAt: sql`UTC_TIMESTAMP()`,
+      updatedAt: sql`UTC_TIMESTAMP()`
+    });
 
-    await connection.execute(
-      `INSERT INTO box_sales (
-         id, customer_id, instance_id, license_id, package_sku, modules,
-         list_price_rub, sold_price_rub, sold_at, contract_ref, sales_user_id, notes
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        saleId,
-        data.customerId,
-        instanceId,
-        data.licenseId,
-        data.packageSku,
-        JSON.stringify(data.modules),
-        data.listPriceRub,
-        data.soldPriceRub,
-        data.soldAt,
-        data.contractRef,
-        data.salesUserId,
-        data.notes
-      ]
-    );
+    await tx.insert(boxSales).values({
+      id: saleId,
+      customerId: data.customerId,
+      instanceId,
+      licenseId: data.licenseId,
+      packageSku: data.packageSku,
+      modules: data.modules,
+      listPriceRub: data.listPriceRub,
+      soldPriceRub: data.soldPriceRub,
+      soldAt: sql`DATE(${data.soldAt})`,
+      contractRef: data.contractRef,
+      salesUserId: data.salesUserId,
+      notes: data.notes,
+      createdAt: sql`UTC_TIMESTAMP()`,
+      updatedAt: sql`UTC_TIMESTAMP()`
+    });
 
-    const [rows] = await connection.execute<BoxSaleRow[]>(
-      `SELECT bs.id, bs.customer_id, bs.instance_id, bs.license_id, bs.package_sku,
-              bs.modules, bs.list_price_rub, bs.sold_price_rub, bs.sold_at,
-              bs.contract_ref, bs.sales_user_id, bs.notes, bs.created_at, bs.updated_at,
-              c.legal_name, c.inn
-       FROM box_sales bs
-       INNER JOIN customers c ON c.id = bs.customer_id
-       WHERE bs.id = ?
-       LIMIT 1`,
-      [saleId]
-    );
+    const rows = await tx
+      .select({
+        id: boxSales.id,
+        customerId: boxSales.customerId,
+        instanceId: boxSales.instanceId,
+        licenseId: boxSales.licenseId,
+        packageSku: boxSales.packageSku,
+        modules: boxSales.modules,
+        listPriceRub: boxSales.listPriceRub,
+        soldPriceRub: boxSales.soldPriceRub,
+        soldAt: boxSales.soldAt,
+        contractRef: boxSales.contractRef,
+        salesUserId: boxSales.salesUserId,
+        notes: boxSales.notes,
+        createdAt: boxSales.createdAt,
+        updatedAt: boxSales.updatedAt,
+        legalName: customers.legalName,
+        inn: customers.inn
+      })
+      .from(boxSales)
+      .innerJoin(customers, eq(customers.id, boxSales.customerId))
+      .where(eq(boxSales.id, saleId))
+      .limit(1);
 
     if (rows.length === 0) {
       throw new Error("Failed to create box sale with instance");
@@ -328,26 +361,19 @@ export async function updateBoxSale(
     return null;
   }
 
-  const db = getDbPool();
-  await db.execute(
-    `UPDATE box_sales SET
-       instance_id = ?,
-       license_id = ?,
-       sold_price_rub = ?,
-       sold_at = ?,
-       contract_ref = ?,
-       notes = ?
-     WHERE id = ?`,
-    [
-      data.instanceId !== undefined ? data.instanceId : existing.instanceId,
-      data.licenseId !== undefined ? data.licenseId : existing.licenseId,
-      data.soldPriceRub ?? existing.soldPriceRub,
-      data.soldAt ?? existing.soldAt,
-      data.contractRef !== undefined ? data.contractRef : existing.contractRef,
-      data.notes !== undefined ? data.notes : existing.notes,
-      id
-    ]
-  );
+  const db = getDrizzleDb();
+  await db
+    .update(boxSales)
+    .set({
+      instanceId: data.instanceId !== undefined ? data.instanceId : existing.instanceId,
+      licenseId: data.licenseId !== undefined ? data.licenseId : existing.licenseId,
+      soldPriceRub: data.soldPriceRub ?? existing.soldPriceRub,
+      soldAt: sql`DATE(${data.soldAt ?? existing.soldAt})`,
+      contractRef: data.contractRef !== undefined ? data.contractRef : existing.contractRef,
+      notes: data.notes !== undefined ? data.notes : existing.notes,
+      updatedAt: sql`UTC_TIMESTAMP()`
+    })
+    .where(eq(boxSales.id, id));
 
   return findBoxSaleById(id);
 }
@@ -361,16 +387,18 @@ export async function getBoxSalesStats(params: {
   byPackage: Array<{ packageSku: string; count: number; revenueRub: string }>;
   avgSoldPriceRub: string;
 }> {
-  const db = getDbPool();
-  const { whereClause, values } = buildListConditions(params);
+  const db = getDrizzleDb();
+  const conditions = buildListConditions(params);
+  const whereExpr = conditions.length > 0 ? and(...conditions) : undefined;
 
-  const [totalRows] = await db.execute<RowDataPacket[]>(
-    `SELECT COUNT(*) AS totalCount, COALESCE(SUM(bs.sold_price_rub), 0) AS revenueRub
-     FROM box_sales bs
-     INNER JOIN customers c ON c.id = bs.customer_id
-     ${whereClause}`,
-    values
-  );
+  const totalRows = await db
+    .select({
+      totalCount: sql<number>`count(*)`,
+      revenueRub: sql<number | string>`coalesce(sum(${boxSales.soldPriceRub}), 0)`
+    })
+    .from(boxSales)
+    .innerJoin(customers, eq(customers.id, boxSales.customerId))
+    .where(whereExpr);
 
   const totalCount = Number(totalRows[0]?.totalCount ?? 0);
   const revenueRub = formatRubDecimal(totalRows[0]?.revenueRub ?? 0);
@@ -379,17 +407,17 @@ export async function getBoxSalesStats(params: {
       ? "0.00"
       : formatRubDecimal(Number(revenueRub) / totalCount);
 
-  const [packageRows] = await db.execute<RowDataPacket[]>(
-    `SELECT bs.package_sku AS packageSku,
-            COUNT(*) AS count,
-            COALESCE(SUM(bs.sold_price_rub), 0) AS revenueRub
-     FROM box_sales bs
-     INNER JOIN customers c ON c.id = bs.customer_id
-     ${whereClause}
-     GROUP BY bs.package_sku
-     ORDER BY bs.package_sku ASC`,
-    values
-  );
+  const packageRows = await db
+    .select({
+      packageSku: boxSales.packageSku,
+      count: sql<number>`count(*)`,
+      revenueRub: sql<number | string>`coalesce(sum(${boxSales.soldPriceRub}), 0)`
+    })
+    .from(boxSales)
+    .innerJoin(customers, eq(customers.id, boxSales.customerId))
+    .where(whereExpr)
+    .groupBy(boxSales.packageSku)
+    .orderBy(boxSales.packageSku);
 
   return {
     totalCount,
@@ -404,10 +432,11 @@ export async function getBoxSalesStats(params: {
 }
 
 export async function boxSaleExists(id: string): Promise<boolean> {
-  const db = getDbPool();
-  const [rows] = await db.execute<RowDataPacket[]>(
-    "SELECT id FROM box_sales WHERE id = ? LIMIT 1",
-    [id]
-  );
+  const db = getDrizzleDb();
+  const rows = await db
+    .select({ id: boxSales.id })
+    .from(boxSales)
+    .where(eq(boxSales.id, id))
+    .limit(1);
   return rows.length > 0;
 }
