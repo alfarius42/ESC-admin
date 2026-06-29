@@ -17,6 +17,7 @@
 - [VENDOR_INTEGRATION.md](active/VENDOR_INTEGRATION.md)
 - [TODO.md](active/TODO.md)
 - [GIT_WORKFLOW.md](active/GIT_WORKFLOW.md) — feature → develop → main, CI
+- [GITHUB_RULES.md](active/GITHUB_RULES.md) — branch protection, PR policy
 
 ## Референс коробки (не admin API)
 
