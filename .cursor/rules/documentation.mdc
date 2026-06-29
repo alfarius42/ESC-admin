@@ -1,0 +1,33 @@
+---
+description: Documentation layout, index workflow, reference vs active
+globs: "docs/**/*.md"
+alwaysApply: false
+---
+
+# Documentation
+
+## Layout
+
+| Path | Purpose |
+|------|---------|
+| `docs/active/` | Admin specs — **source of truth** for this repo |
+| `docs/reference/esc-promo/` | **Read-only copies** of ESC-Promo product docs |
+| `docs/archive/` | Superseded admin docs |
+| `docs/active/DOCUMENTATION_INDEX.md` | Full index — update on every new doc |
+| `CURSOR_CONTEXT.md` | Lightweight index — update for key docs |
+
+## Reference vs Active
+
+- **Active** — пишем и правим здесь (`VENDOR_ADMIN_SPEC`, `VENDOR_INTEGRATION`, `TODO`).
+- **Reference** — снимок коробки; синхронизация из `ESC-Promo/docs/active/` (см. `docs/reference/esc-promo/README.md`).
+- Не дублировать между active и reference: admin-ТЗ только в active; API/архитектура коробки — только в reference.
+
+## New Documents
+
+- Filename: `SCREAMING_SNAKE.md` in `docs/active/`
+- Header: status, related files
+- Add entry to `DOCUMENTATION_INDEX.md` and при необходимости `CURSOR_CONTEXT.md`
+
+## Process
+
+Docs before code — см. `development-process.mdc`.

@@ -1,0 +1,55 @@
+---
+description: Git branching, CI, PR flow — feature → develop → main
+alwaysApply: true
+---
+
+# Git Workflow
+
+## Branching model
+
+| Ветка | Назначение |
+|-------|------------|
+| `main` | **Только production.** Релизы и hotfix после проверки. |
+| `develop` | Интеграция. Сюда мерджатся feature после CI и тестирования. |
+| `feature/*` | Вся разработка. Создавать от актуального `develop`. |
+
+**Запрещено:** коммиты фич напрямую в `main` или `develop` (исключение — maintainer merge через PR).
+
+## Цикл работы
+
+1. `git checkout develop && git pull origin develop`
+2. `git checkout -b feature/<short-name>`
+3. Локальные коммиты (формат: `feat:`, `fix:`, `docs:` …)
+4. `git push -u origin feature/<short-name>` → **CI на GitHub**
+5. `gh pr create --base develop` — PR в `develop`
+6. Дождаться **green CI** + ручное тестирование → merge PR
+7. **Production:** отдельный PR `develop` → `main` (или release-ветка) только когда версия готова к продакшну
+
+## Коммиты (агент)
+
+- Создавать коммиты **только по явному запросу** пользователя.
+- Перед коммитом: `git status`, `git diff`, `git log -1`.
+- Новая работа — на **feature-ветке**, не на `main`/`develop`.
+- Не коммитить `.env`, credentials, `*.pem`.
+- Never `git config` changes; never `--no-verify` unless user requests.
+
+## Push & PR
+
+- Push — по запросу; target branch = `feature/*`, не `main`.
+- PR target по умолчанию: **`develop`**, не `main`.
+- Never force-push to `main` or `develop`.
+- PR через `gh pr create`; summary + test plan; HEREDOC для body.
+
+## CI
+
+- Workflow: `.github/workflows/ci.yml`
+- Триггеры: push `feature/**`, `develop`; PR → `develop`, `main`
+- Merge в `develop` только при green CI (+ локальные checks по `lint-ci-mandatory` skill при наличии кода)
+
+## Auth
+
+- `gh auth setup-git`; scope `repo` для private repo.
+
+## После failed hook
+
+- Fix → **новый** commit, не amend failed commit.

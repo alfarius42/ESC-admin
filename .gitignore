@@ -1,0 +1,44 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build
+dist/
+build/
+*.tsbuildinfo
+
+# Environment & secrets
+.env
+.env.*
+!.env.example
+
+# Keys & credentials
+*.pem
+*.key
+license-private.pem
+license-public.pem
+
+# Logs & runtime
+logs/
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# OS & IDE
+.DS_Store
+Thumbs.db
+.idea/
+*.swp
+*.swo
+
+# Test & coverage
+coverage/
+.nyc_output/
+
+# Docker
+pgdata/
+
+# Cursor local (keep .cursor/rules in repo)
+.cursor/*
+!.cursor/rules/
+!.cursor/rules/**

@@ -1,0 +1,55 @@
+name: ci
+
+on:
+  pull_request:
+    branches: [develop, main]
+  push:
+    branches:
+      - develop
+      - 'feature/**'
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality-gates:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Docs-only pass (monorepo not initialized)
+        if: hashFiles('package.json') == ''
+        run: |
+          echo "No package.json — docs/setup phase."
+          echo "Quality gates (lint, test, build) activate after Chunk 0."
+
+      - name: Setup pnpm
+        if: hashFiles('package.json') != ''
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node
+        if: hashFiles('package.json') != ''
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        if: hashFiles('package.json') != ''
+        run: pnpm install --frozen-lockfile
+
+      - name: Block forbidden any
+        if: hashFiles('package.json') != ''
+        run: pnpm check:no-any
+
+      - name: Tests
+        if: hashFiles('package.json') != ''
+        run: pnpm test:run
+
+      - name: Build
+        if: hashFiles('package.json') != ''
+        run: pnpm build

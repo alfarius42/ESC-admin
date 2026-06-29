@@ -1,0 +1,33 @@
+---
+description: TypeScript and API conventions for vendor-admin
+globs: "**/*.{ts,tsx}"
+alwaysApply: false
+---
+
+# TypeScript & API
+
+## Language
+
+- TypeScript strict; **`any` forbidden**.
+- Files ≤ 1000 lines; split modules by domain (`apps/api/src/modules/*`).
+
+## API Shape
+
+```typescript
+// Envelope for all REST responses
+{ success: true, data: T, error: null }
+{ success: false, data: null, error: { code, message, details? } }
+```
+
+- Money: decimal strings `"180000.00"` (2 places).
+- Dates: ISO 8601 UTC strings.
+
+## License Signing
+
+- Implement in `packages/license-signing`; must match ESC-Promo `license/service.js`.
+- `LICENSE_PRIVATE_KEY` — backend only, never frontend bundle.
+
+## MVP Auth
+
+- Single admin user; `requireAuth` on `/api/v1/*` except `/public/*` and `/auth/login`.
+- No RBAC middleware or `/users` endpoints in MVP.

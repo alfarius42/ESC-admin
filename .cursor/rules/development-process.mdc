@@ -1,0 +1,40 @@
+---
+description: Порядок работы — docs-first, коммиты, индекс (из ESC-Promo, без дубля git/TS)
+alwaysApply: true
+---
+
+# Development Process
+
+## Порядок: документация → код
+
+1. Сначала контекст из `CURSOR_CONTEXT.md` / `DOCUMENTATION_INDEX.md`.
+2. Изменения в документации — **до** изменений в коде.
+3. Новая фича admin: описание/API в `docs/active/` до реализации.
+4. В доке: что меняется, почему, как проверить.
+
+## Два канона API (не смешивать)
+
+| Система | Канон |
+|---------|-------|
+| Vendor-admin | `docs/active/VENDOR_ADMIN_SPEC.md` §8 |
+| Коробка ESC-Promo | `docs/reference/esc-promo/API_CONTRACT.md` (референс) |
+
+## Индекс
+
+- Полный список: `docs/active/DOCUMENTATION_INDEX.md`.
+- При новом ключевом документе — обновить индекс и `CURSOR_CONTEXT.md`.
+- Admin-спеки → `docs/active/`; референс продукта → только `docs/reference/esc-promo/` (перекопировать из ESC-Promo, не править локально).
+
+## Коммиты (формат)
+
+`<тип>: <описание>` — типы: feat, fix, docs, refactor, test, chore, ci, build.  
+Работа — в `feature/*` от `develop`; merge в `develop` после CI; `main` — только production.  
+Подробно: `docs/active/GIT_WORKFLOW.md`, `.cursor/rules/git-workflow.mdc`.
+
+## После чанка генерации
+
+`pnpm test:run` в затронутом пакете (см. `VENDOR_ADMIN_SPEC.md` §0).
+
+## Лимит строк
+
+Только **код** ≤ 1000 строк (см. `typescript-standards.mdc`). Документация — без лимита.
