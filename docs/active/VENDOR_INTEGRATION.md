@@ -2,8 +2,28 @@
 
 > **Статус:** принято (документация). Реализация — MVP-5.  
 > **Vendor-admin:** отдельный репо, см. `VENDOR_ADMIN_SPEC.md`.  
-> **Коробка:** `ESC-Promo`, activate API — [`API_CONTRACT.md`](../reference/esc-promo/API_CONTRACT.md) §2.2–2.4.  
+> **Скелетон + жёсткая граница API:** `ADMIN_SKELETON_SPEC.md` §3.  
+> **Коробка:** `ESC-Promo` (`C:\ESC-Promo`), activate API — [`API_CONTRACT.md`](../reference/esc-promo/API_CONTRACT.md) §2.2–2.4.  
 > **Support chat:** `SUPPORT_CHAT.md` (только в репо ESC-Promo).
+
+---
+
+## 0. Жёсткая граница API (ESC-Promo → vendor-admin)
+
+> **Канон license lifecycle online.** Полная таблица и диаграмма — `ADMIN_SKELETON_SPEC.md` §3.
+
+| # | Правило |
+|---|---------|
+| G1 | Коробка обращается к admin **только** для **проверки integration token** (`X-Instance-Token`) |
+| G2 | **Два момента:** (a) первый старт backend после настройки token; (b) **раз в 30 суток** (`lastVerifiedAt`, [`BOX_PRODUCT_SPEC.md`](../reference/esc-promo/BOX_PRODUCT_SPEC.md) §4.3) |
+| G3 | Timeout **3 s**; сбой/5xx — warning в лог, **offline runtime не блокируется** |
+| G4 | Активация кодом — **всегда локально** (`LICENSE_PUBLIC_KEY`); admin не участвует в runtime activate |
+| G5 | После оплаты renewal-код или новый token **передаётся клиенту вне admin** (email, мессенджер); admin **не пушит** в коробку |
+| G6 | Polling admin чаще 1 раз / 30 суток — **запрещён** |
+
+**Единственный periodic outbound (license):** `POST /api/v1/integrations/verify-instance-token` — §4.0.
+
+**Исключения (не periodic):** optional `verify-code` один раз перед activate (`VENDOR_ADMIN_VERIFY_ENABLED`); support chat — отдельный UX-канал, Phase 2 MVP admin.
 
 ---
 
@@ -14,7 +34,7 @@ flowchart TB
   subgraph vendor [Vendor infra]
     Admin[vendor-admin UI+API]
     PrivKey[LICENSE_PRIVATE_KEY]
-    VendorDB[(PostgreSQL vendor)]
+    VendorDB[(MySQL vendor)]
   end
 
   subgraph client [VPS клиента]
@@ -106,21 +126,7 @@ VENDOR_ADMIN_VERIFY_ENABLED=true   # default false; true = пробовать ve
 | `VENDOR_ADMIN_INSTANCE_TOKEN` | если verify/callback | Plain token из admin |
 | `VENDOR_ADMIN_VERIFY_ENABLED` | ❌ | `true` — best-effort verify перед activate |
 
-**ESC-Promo hook (Phase 2):** см. `VENDOR_INTEGRATION.md` §4.4.
-
-### 4.5 Support chat (коробка → admin)
-
-> Канон: **`SUPPORT_CHAT.md`**.
-
-| Операция | Token | MVP |
-|----------|-------|:---:|
-| Director → support messages | `X-Instance-Token` | ✅ |
-| Admin inbox (Box ID + company) | JWT operator | ✅ |
-
-- Thread создаётся при первом сообщении с коробки.
-- Admin inbox: колонки **Box ID** + **legal_name**; unlinked thread → `PATCH .../link`.
-- Box ID на инстансе — **ручной ввод** (`PATCH /instances/:id`) до/после первого сообщения.
-- Чат **не offline** — при недоступности admin UI показывает email fallback.
+**ESC-Promo hook (Phase 2):** см. `VENDOR_INTEGRATION.md` §4.6.
 
 ---
 
@@ -160,7 +166,72 @@ eyJsaWNlbnNlSWQiOi... . MEUCIQ...
 
 Клиент вставляет только **B** в director UI. **A** — для сверки и support.
 
-### 4.3 Online: verify-code (MVP, опционально)
+### 4.3 Online: verify-instance-token (обязательный канал license check)
+
+**Направление:** коробка → vendor-admin.  
+**Когда:** первый старт backend (если заданы `VENDOR_ADMIN_URL` + `VENDOR_ADMIN_INSTANCE_TOKEN`); далее не чаще **1 раз / 30 суток** по `lastVerifiedAt`.
+
+**POST** `{VENDOR_ADMIN_URL}/api/v1/integrations/verify-instance-token`
+
+Headers:
+
+```http
+Content-Type: application/json
+X-Instance-Token: <VENDOR_ADMIN_INSTANCE_TOKEN>
+```
+
+Request:
+
+```json
+{
+  "runtimeInstanceId": "a1b2c3d4e5f6g7h8i9j0k1l2",
+  "productVersion": "1.0.0",
+  "licenseStatus": "active",
+  "validUntil": "2027-06-14T23:59:59.000Z",
+  "reportedAt": "2026-06-29T10:00:00.000Z"
+}
+```
+
+Response `200`:
+
+```json
+{
+  "success": true,
+  "data": {
+    "tokenValid": true,
+    "instanceRegistered": true,
+    "licenseActive": true,
+    "validUntil": "2027-06-14T23:59:59.000Z",
+    "modules": ["pro"],
+    "nextCheckAfterDays": 30,
+    "warnings": []
+  },
+  "error": null
+}
+```
+
+**Поведение коробки:**
+
+- Нет URL/token → skip (offline-only).
+- Fail / timeout / 5xx → **warning**, локальная лицензия без изменений.
+- `401 INVALID_INSTANCE_TOKEN` → banner director; режим grace/expired по **локальному** `validUntil`.
+- Успех → обновить `lastVerifiedAt` в `license-state.json`.
+
+**Поведение admin:** обновить `instances.last_token_verified_at`; audit `integration.token_verified`.
+
+**Запрещено:** вызывать чаще 30 суток; блокировать API коробки при недоступности admin.
+
+### 4.4 Renewal / rotate — доставка вне admin
+
+После ручной оплаты operator:
+
+1. Генерирует **renewal-код** (`POST /licenses/:id/codes`) **или** **rotate token** (`POST /integrations/instances/:id/rotate-token`) в admin UI.
+2. Передаёт клиенту **вне admin** (email, Telegram, счёт).
+3. Клиент вставляет код в director **или** обновляет `.env` и перезапускает коробку.
+
+Admin **не** отправляет код/token автоматически в коробку. Auto-refresh подписки **нет**.
+
+### 4.5 Online: verify-code (MVP, опционально)
 
 **Направление:** коробка → vendor-admin (best-effort, timeout 3s).
 
@@ -209,9 +280,23 @@ Response `200`:
 
 **Auth admin UI** (`POST /codes/verify` с JWT) — отдельный endpoint для operator; token инстанса не нужен.
 
-### 4.4 Phase 2: callback и heartbeat
+### 4.6 Phase 2: callback и heartbeat
 
 См. `VENDOR_ADMIN_SPEC.md` §8.13. Тот же `X-Instance-Token`.
+
+### 4.7 Support chat (коробка → admin)
+
+> Канон: **`SUPPORT_CHAT.md`**. **Не** входит в periodic license token check (§4.3).
+
+| Операция | Token | MVP |
+|----------|-------|:---:|
+| Director → support messages | `X-Instance-Token` | ✅ |
+| Admin inbox (Box ID + company) | JWT operator | ✅ |
+
+- Thread создаётся при первом сообщении с коробки.
+- Admin inbox: колонки **Box ID** + **legal_name**; unlinked thread → `PATCH .../link`.
+- Box ID на инстансе — **ручной ввод** (`PATCH /instances/:id`) до/после первого сообщения.
+- Чат **не offline** — при недоступности admin UI показывает email fallback.
 
 ---
 
@@ -223,14 +308,16 @@ Response `200`:
 |----------|----------|
 | Срок `validUntil` | **365 дней** от `sold_at` (initial) или +365d (renewal) |
 | Авто-refresh | **Нет** — renewal-код выдаёт operator вручную из admin |
+| Доставка renewal | **Вне admin** — email/мессенджер; см. §4.4 |
 | Счётчик в admin | Dashboard «renewals due» 30/14/7 дней |
 | После истечения | Grace 14 дней на коробке (read-only), затем renewal-код |
 
 **Renewal flow:**
 
 1. Dashboard показывает лицензию в окне 30/14/7 дней.
-2. Operator вручную: `POST /licenses/:id/codes` `{ "codeType": "renewal" }`.
-3. Клиент вставляет код в director (как initial).
+2. Operator вручную: `POST /licenses/:id/codes` `{ "codeType": "renewal" }` **или** rotate integration token.
+3. Operator **передаёт код/token клиенту вне admin** (не через API коробки).
+4. Клиент вставляет код в director (как initial) **или** обновляет `.env` + restart.
 
 ### 5.2 Pilot (1 месяц)
 
@@ -313,7 +400,7 @@ Email можно переопределить через `SEED_ADMIN_EMAIL`; pas
 | `LICENSE_PRIVATE_KEY` | ✅ | Подпись кодов |
 | `LICENSE_PUBLIC_KEY` | ✅ | Verify в admin |
 | `JWT_SECRET` | ✅ | Admin login |
-| `DATABASE_URL` | ✅ | PostgreSQL |
+| `DATABASE_URL` | ✅ | MySQL |
 | `CODES_ENCRYPTION_KEY` | ✅ | At-rest encryption кодов |
 | `WEBSITE_PRICE_API_KEY` | ❌ | Public price API |
 | `PUBLIC_CORS_ORIGINS` | ❌ | Marketing site |

@@ -19,8 +19,13 @@
 
 | Задача | Документ |
 |--------|----------|
+| **Карта кода, модули, ops (support / onboarding)** | `docs/active/DEVELOPER_HANDBOOK.md` (§0 quick lookup) |
+| Быстрый старт | `README.md` (ежедневный dev, PowerShell) |
 | Генерация кодовой базы admin | `docs/active/VENDOR_ADMIN_SPEC.md` §0, §18 (чанки) |
+| **Скелетон + граница API ESC-Promo** | `docs/active/ADMIN_SKELETON_SPEC.md` |
 | Backlog MVP | `docs/active/TODO.md` |
+| **Активный спринт (Chunk 2 → 3)** | `docs/active/IMPLEMENTATION_SPRINT_2.md` |
+| Завершённый Sprint 1 (Chunk 0 → 1) | `docs/active/IMPLEMENTATION_NEAREST_TASKS.md` |
 | Admin ↔ коробка, токены | `docs/active/VENDOR_INTEGRATION.md` |
 | REST admin API | `docs/active/VENDOR_ADMIN_SPEC.md` §8 |
 | Activate / verify на коробке | `docs/reference/esc-promo/API_CONTRACT.md` §2 |
@@ -33,9 +38,13 @@
 
 ### Admin (источник истины — этот репо)
 
+- **`docs/active/DEVELOPER_HANDBOOK.md`** — module map, фактическое состояние кода, env, flows, troubleshooting; обновлять с кодом (`.cursor/rules/documentation.mdc`).
+- **`docs/active/ADMIN_SKELETON_SPEC.md`** — Chunk 0 skeleton, жёсткая граница API с ESC-Promo.
 - **`docs/active/VENDOR_ADMIN_SPEC.md`** — полное ТЗ vendor-admin.
 - **`docs/active/VENDOR_INTEGRATION.md`** — offline-first, per-instance token, verify-code.
 - **`docs/active/TODO.md`** — прогресс чанков 0–12.
+- **`docs/active/IMPLEMENTATION_SPRINT_2.md`** — активный спринт: Chunk 2 + Chunk 3 (детальные задачи T1–T5).
+- **`docs/active/IMPLEMENTATION_NEAREST_TASKS.md`** — завершённый Sprint 1 (Chunk 0 → Chunk 1).
 
 ### Референс продукта ESC-Promo (копии, read-only)
 

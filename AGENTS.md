@@ -9,11 +9,13 @@
 
 | Задача | Файл |
 |--------|------|
+| **Support / module map (human + AI)** | `docs/active/DEVELOPER_HANDBOOK.md` |
 | Быстрый старт | `CURSOR_CONTEXT.md` |
 | Полный индекс | `docs/active/DOCUMENTATION_INDEX.md` |
 | ТЗ admin | `docs/active/VENDOR_ADMIN_SPEC.md` |
 | Интеграция admin ↔ коробка | `docs/active/VENDOR_INTEGRATION.md` |
 | Backlog | `docs/active/TODO.md` |
+| **Активный спринт** | `docs/active/IMPLEMENTATION_SPRINT_2.md` |
 | **Референс продукта** | `docs/reference/esc-promo/` |
 
 ## Два канона (не путать)
@@ -29,6 +31,7 @@
 
 ## Процесс
 
+- **Handbook (module map):** `docs/active/DEVELOPER_HANDBOOK.md` — фактическое состояние кода; обновлять с кодом (`.cursor/rules/documentation.mdc`, always apply)
 - Docs-first → см. `.cursor/rules/development-process.mdc`
 - Git → `.cursor/rules/git-workflow.mdc`
 - Референс ESC-Promo не редактировать — перекопировать из `C:\ESC-Promo\docs\active\`

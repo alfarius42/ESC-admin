@@ -9,7 +9,7 @@
 - **README.md** — описание проекта, стек, git setup.
 - **CURSOR_CONTEXT.md** — легковесный индекс для навигации (начинать с него).
 - **AGENTS.md** — контекст для Cursor-агента (чанки, git, документация).
-- **.cursor/rules/** — правила Cursor (стандарты, git, TypeScript, документация, процесс).
+- **`.cursor/rules/documentation.mdc`** — always apply: handbook maintenance, human+AI format.
 
 ---
 
@@ -17,10 +17,14 @@
 
 Документы **этого репозитория** — источник истины для vendor-admin.
 
+- **DEVELOPER_HANDBOOK.md** — **справочник поддержки (human + AI):** §0 quick lookup, карта модулей, flows, API/status, env, БД, runbook, §13 как обновлять. Always apply: `.cursor/rules/documentation.mdc`.
 - **DOCUMENTATION_INDEX.md** (этот файл) — полный индекс.
 - **VENDOR_ADMIN_SPEC.md** — **implementation-ready ТЗ:** API §8, SQL, UI, чанки генерации 0–12.
+- **ADMIN_SKELETON_SPEC.md** — Chunk 0 skeleton, `verify-instance-token`, граница API с ESC-Promo.
 - **VENDOR_INTEGRATION.md** — интеграция admin ↔ коробка: token, verify-code, deploy, offline-first.
 - **TODO.md** — backlog MVP admin и чеклист интеграции с ESC-Promo.
+- **IMPLEMENTATION_NEAREST_TASKS.md** — завершённый план Sprint 1 (Chunk 0 → Chunk 1).
+- **IMPLEMENTATION_SPRINT_2.md** — **активный спринт:** Chunk 2 (auth/DB) + Chunk 3 (customers/instances), задачи T1–T5 с промптами для агента.
 - **GIT_WORKFLOW.md** — ветки feature → develop → main, CI, PR.
 - **GITHUB_RULES.md** — branch protection, default branch, PR template, CI checks.
 

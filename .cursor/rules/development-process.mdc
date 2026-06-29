@@ -7,10 +7,11 @@ alwaysApply: true
 
 ## Порядок: документация → код
 
-1. Сначала контекст из `CURSOR_CONTEXT.md` / `DOCUMENTATION_INDEX.md`.
+1. Сначала контекст: `CURSOR_CONTEXT.md` → **`docs/active/DEVELOPER_HANDBOOK.md`** (фактический код) → `DOCUMENTATION_INDEX.md`.
 2. Изменения в документации — **до** изменений в коде.
 3. Новая фича admin: описание/API в `docs/active/` до реализации.
 4. В доке: что меняется, почему, как проверить.
+5. После кода — обновить **`DEVELOPER_HANDBOOK.md`** (§2 модули, §3 API, §4 env, §5 БД, §10 roadmap). См. `.cursor/rules/documentation.mdc`.
 
 ## Два канона API (не смешивать)
 
