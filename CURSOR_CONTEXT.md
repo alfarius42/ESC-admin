@@ -26,6 +26,7 @@
 | Backlog MVP | `docs/active/TODO.md` |
 | **Активный спринт (Chunk 5 price lists)** | `docs/active/TODO.md` § Chunk 5 |
 | Завершённый Sprint 3 (Chunk 4 + Web Shell) | `docs/active/IMPLEMENTATION_SPRINT_3.md` |
+| Консолидированная миграция sales на Drizzle | `docs/active/DRIZZLE_MIGRATION_SALES.md` |
 | Завершённый Sprint 1 (Chunk 0 → 1) | `docs/active/IMPLEMENTATION_NEAREST_TASKS.md` |
 | Завершённый Sprint 2 (Chunk 2 → 3) | `docs/active/IMPLEMENTATION_SPRINT_2.md` |
 | Admin ↔ коробка, токены | `docs/active/VENDOR_INTEGRATION.md` |
@@ -46,6 +47,7 @@
 - **`docs/active/VENDOR_INTEGRATION.md`** — offline-first, per-instance token, verify-code.
 - **`docs/active/TODO.md`** — прогресс чанков 0–12.
 - **`docs/active/IMPLEMENTATION_SPRINT_3.md`** — завершённый Sprint 3: Chunk 4 + Web Shell.
+- **`docs/active/DRIZZLE_MIGRATION_SALES.md`** — docs-first план и acceptance для миграции `boxSales`/`upsellSales` на Drizzle.
 - **`docs/active/IMPLEMENTATION_SPRINT_2.md`** — завершённый Sprint 2 (Chunk 2 + Chunk 3).
 - **`docs/active/IMPLEMENTATION_NEAREST_TASKS.md`** — завершённый Sprint 1 (Chunk 0 → Chunk 1).
 

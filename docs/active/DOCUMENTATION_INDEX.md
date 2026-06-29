@@ -27,6 +27,7 @@
 - **IMPLEMENTATION_SPRINT_2.md** — завершённый Sprint 2: Chunk 2 (auth/DB) + Chunk 3 (customers/instances).
 - **IMPLEMENTATION_SPRINT_3.md** — завершённый Sprint 3: Chunk 4 (boxSales/upsellSales) + Web Shell.
 - **SPRINT_3_CODE_REVIEW_FIXES.md** — строгий review Sprint 3: риски, приоритеты P0/P1/P2, план доработок.
+- **DRIZZLE_MIGRATION_SALES.md** — docs-first план и критерии полной миграции `boxSales` + `upsellSales` на Drizzle.
 - **GIT_WORKFLOW.md** — ветки feature → develop → main, CI, PR.
 - **GITHUB_RULES.md** — branch protection, default branch, PR template, CI checks.
 
