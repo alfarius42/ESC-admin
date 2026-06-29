@@ -30,6 +30,7 @@
 - [ ] Cross-check совместимости подписи с конкретным ключом/потоком из ESC-Promo (вне unit-тестов пакета).
 - [x] Обновить `TODO.md` по фактически закрытым пунктам Chunk 0/1.
 - [x] Подготовить вход в Chunk 2: ORM decision log + каркас auth/db modules.
+- [x] Закрыть clean-path Chunk 2: strict DB-only login + отказ от legacy seed fallback.
 - [ ] Закрыть оставшиеся пункты Chunk 2 (ORM слой + привязка auth/login к реальному seeded user через живую БД в smoke).
 
 ---

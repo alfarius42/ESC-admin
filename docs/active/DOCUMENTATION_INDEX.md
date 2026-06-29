@@ -24,7 +24,9 @@
 - **VENDOR_INTEGRATION.md** — интеграция admin ↔ коробка: token, verify-code, deploy, offline-first.
 - **TODO.md** — backlog MVP admin и чеклист интеграции с ESC-Promo.
 - **IMPLEMENTATION_NEAREST_TASKS.md** — завершённый план Sprint 1 (Chunk 0 → Chunk 1).
-- **IMPLEMENTATION_SPRINT_2.md** — **активный спринт:** Chunk 2 (auth/DB) + Chunk 3 (customers/instances), задачи T1–T5 с промптами для агента.
+- **IMPLEMENTATION_SPRINT_2.md** — завершённый Sprint 2: Chunk 2 (auth/DB) + Chunk 3 (customers/instances).
+- **IMPLEMENTATION_SPRINT_3.md** — завершённый Sprint 3: Chunk 4 (boxSales/upsellSales) + Web Shell.
+- **SPRINT_3_CODE_REVIEW_FIXES.md** — строгий review Sprint 3: риски, приоритеты P0/P1/P2, план доработок.
 - **GIT_WORKFLOW.md** — ветки feature → develop → main, CI, PR.
 - **GITHUB_RULES.md** — branch protection, default branch, PR template, CI checks.
 

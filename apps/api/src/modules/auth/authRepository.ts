@@ -1,6 +1,7 @@
-import type { RowDataPacket } from "mysql2";
+import { eq } from "drizzle-orm";
 import { env } from "../../config/environment.js";
-import { getDbPool } from "../../db/client.js";
+import { getDrizzleDb } from "../../db/client.js";
+import { users } from "../../db/schema.js";
 
 export type AuthUser = {
   id: string;
@@ -11,40 +12,36 @@ export type AuthUser = {
   isActive: boolean;
 };
 
-type UserRow = RowDataPacket & {
-  id: string;
-  email: string;
-  password_hash: string;
-  display_name: string;
-  user_role: "admin";
-  is_active: number;
-};
-
 export async function findUserByEmail(email: string): Promise<AuthUser | null> {
   if (!env.databaseUrl) {
     throw new Error("DATABASE_URL is required for auth");
   }
 
-  const db = getDbPool();
-  const [rows] = await db.execute<UserRow[]>(
-    `SELECT id, email, password_hash, display_name, user_role, is_active
-     FROM users
-     WHERE email = ?
-     LIMIT 1`,
-    [email]
-  );
+  const db = getDrizzleDb();
+  const rows = await db
+    .select({
+      id: users.id,
+      email: users.email,
+      passwordHash: users.passwordHash,
+      displayName: users.displayName,
+      role: users.userRole,
+      isActive: users.isActive
+    })
+    .from(users)
+    .where(eq(users.email, email))
+    .limit(1);
 
-  if (rows.length === 0) {
+  const row = rows[0];
+  if (!row || row.role !== "admin") {
     return null;
   }
 
-  const row = rows[0];
   return {
     id: row.id,
     email: row.email,
-    displayName: row.display_name,
-    role: row.user_role,
-    passwordHash: row.password_hash,
-    isActive: Boolean(row.is_active)
+    displayName: row.displayName,
+    role: "admin",
+    passwordHash: row.passwordHash,
+    isActive: Boolean(row.isActive)
   };
 }

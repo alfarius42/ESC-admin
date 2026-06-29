@@ -1,14 +1,13 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import { Navigate, Route, Routes } from "react-router-dom";
-import { PlaceholderPage } from "./pages/PlaceholderPage";
-function LoginStubPage() {
-    return (_jsxs("main", { style: {
-            fontFamily: "Times New Roman, serif",
-            maxWidth: 480,
-            margin: "40px auto",
-            padding: "0 16px"
-        }, children: [_jsx("h1", { style: { fontFamily: "Ubuntu, sans-serif", color: "#243954" }, children: "Login" }), _jsx("p", { children: "Chunk 0 stub. Real authentication UI is implemented in Chunk 2." })] }));
-}
+import { ProtectedRoute } from "./features/auth/ProtectedRoute";
+import { AppLayout } from "./layouts/AppLayout";
+import { DashboardPage } from "./pages/DashboardPage";
+import { LoginPage } from "./pages/LoginPage";
+import { BoxSalesListPage } from "./pages/sales/BoxSalesListPage";
+import { NewBoxSalePage } from "./pages/sales/NewBoxSalePage";
+import { NewUpsellSalePage } from "./pages/sales/NewUpsellSalePage";
+import { UpsellSalesListPage } from "./pages/sales/UpsellSalesListPage";
 export default function App() {
-    return (_jsxs(Routes, { children: [_jsx(Route, { path: "/", element: _jsx(PlaceholderPage, {}) }), _jsx(Route, { path: "/login", element: _jsx(LoginStubPage, {}) }), _jsx(Route, { path: "*", element: _jsx(Navigate, { to: "/", replace: true }) })] }));
+    return (_jsxs(Routes, { children: [_jsx(Route, { path: "/login", element: _jsx(LoginPage, {}) }), _jsx(Route, { element: _jsx(ProtectedRoute, {}), children: _jsxs(Route, { element: _jsx(AppLayout, {}), children: [_jsx(Route, { path: "/", element: _jsx(DashboardPage, {}) }), _jsx(Route, { path: "/sales/boxes", element: _jsx(BoxSalesListPage, {}) }), _jsx(Route, { path: "/sales/boxes/new", element: _jsx(NewBoxSalePage, {}) }), _jsx(Route, { path: "/sales/upsells", element: _jsx(UpsellSalesListPage, {}) }), _jsx(Route, { path: "/sales/upsells/new", element: _jsx(NewUpsellSalePage, {}) })] }) }), _jsx(Route, { path: "*", element: _jsx(Navigate, { to: "/", replace: true }) })] }));
 }

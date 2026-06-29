@@ -1,6 +1,6 @@
 # Developer Handbook — ESC-Admin (Regpoint Vendor Admin)
 
-> **Статус:** актуально на 2026-06-29 (Chunk 0–3: auth, customers, instances).  
+> **Статус:** актуально на 2026-06-29 (Chunk 0–4: auth, customers, instances, sales).  
 > **Аудитория:** разработчик поддержки, новый участник команды, ИИ-агент в Cursor.  
 > **Канон продукта:** [`VENDOR_ADMIN_SPEC.md`](VENDOR_ADMIN_SPEC.md) · **Скелетон:** [`ADMIN_SKELETON_SPEC.md`](ADMIN_SKELETON_SPEC.md) · **Интеграция с коробкой:** [`VENDOR_INTEGRATION.md`](VENDOR_INTEGRATION.md)  
 > **Правило поддержки:** [`.cursor/rules/documentation.mdc`](../../.cursor/rules/documentation.mdc) (always apply)
@@ -42,6 +42,9 @@
 | Auth login/me/logout | `apps/api/src/routes/auth.ts` |
 | Customers CRUD | `apps/api/src/modules/customers/customersRoutes.ts` |
 | Instances CRUD + rotate-token | `apps/api/src/modules/instances/instancesRoutes.ts` |
+| Box sales CRUD + stats | `apps/api/src/modules/boxSales/boxSalesRoutes.ts` |
+| Upsell sales CRUD + stats | `apps/api/src/modules/upsellSales/upsellSalesRoutes.ts` |
+| SKU catalog constants | `apps/api/src/modules/sales/skuCatalog.ts` |
 | Проверка token hash (re-export) | `apps/api/src/db/instancesRepository.ts` |
 | Парсинг env | `apps/api/src/config/environment.ts` |
 | Reusable middleware token (не на router) | `apps/api/src/middleware/instanceTokenAuth.ts` |
@@ -51,7 +54,7 @@
 | Verify code offline | `packages/license-signing/src/verify.ts` |
 | Парсинг envelope (dot / JSON) | `packages/license-signing/src/parse.ts` |
 | Public exports пакета signing | `packages/license-signing/src/index.ts` |
-| Миграция instances | `apps/api/db/migrations/001_skeleton.sql` |
+| Полная SQL миграция | `apps/api/db/migrations/001_initial.sql` |
 | Seed dev instance | `apps/api/scripts/seed-dev-instance.ts` |
 | Какие порты / конфликт с ESC-Promo? | [§5.1 Port allocation](#51-port-allocation-параллельно-с-esc-promo) |
 | Smoke script | `scripts/smoke.ps1` |
@@ -60,7 +63,9 @@
 | Граница admin ↔ коробка | `docs/active/ADMIN_SKELETON_SPEC.md` §2–§3 |
 | API коробки (reference) | `docs/reference/esc-promo/API_CONTRACT.md` |
 | Backlog чанков (чеклист) | `docs/active/TODO.md` |
-| Активный спринт | `docs/active/IMPLEMENTATION_SPRINT_2.md` |
+| Активный спринт | `docs/active/TODO.md` § Chunk 5 |
+| Sprint 3 (закрыт) | `docs/active/IMPLEMENTATION_SPRINT_3.md` |
+| Sprint 2 (закрыт) | `docs/active/IMPLEMENTATION_SPRINT_2.md` |
 | Sprint 1 (закрыт) | `docs/active/IMPLEMENTATION_NEAREST_TASKS.md` |
 
 ---
@@ -123,10 +128,13 @@ ESC-Admin/
 | `src/routes/auth.ts` | `POST /auth/login`, `GET /auth/me`, `POST /auth/logout` | Chunk 2 |
 | `src/middleware/auth.ts` | `requireAuth` (JWT Bearer) | Chunk 2 |
 | `src/middleware/rateLimit.ts` | Rate limit на login (ключ: socket IP, не X-Forwarded-For) | Chunk 2 |
-| `src/db/client.ts` | mysql2 pool (Drizzle deferred) | Chunk 2 |
+| `src/db/client.ts` | mysql2 pool + Drizzle DB accessor (`getDrizzleDb`) | Chunk 2 |
 | `src/modules/auth/*` | Auth service + repository | Chunk 2 |
 | `src/modules/customers/*` | Customers CRUD | Chunk 3 |
 | `src/modules/instances/*` | Instances CRUD, token lifecycle | Chunk 3 |
+| `src/modules/boxSales/*` | Box sales CRUD + stats | Chunk 4 |
+| `src/modules/upsellSales/*` | Upsell sales CRUD + stats | Chunk 4 |
+| `src/modules/sales/skuCatalog.ts` | Package/upsell SKU constants | Chunk 4 |
 | `src/utils/pagination.ts` | List pagination helpers | Chunk 2 |
 | `src/db/instancesRepository.ts` | Re-export token lookup для integrations | Chunk 3 |
 | `db/migrations/001_initial.sql` | Полная schema §10 | Chunk 2 |
@@ -135,7 +143,8 @@ ESC-Admin/
 | `tests/customers.integration.test.ts` | Customers route tests | — |
 | `tests/instances.integration.test.ts` | Instances routes (repository mocked) | — |
 | `tests/instancesService.test.ts` | createInstanceRecord pending-hash / display-once | — |
-| `tests/integration-route.test.ts` | verify-instance-token regression | — |
+| `tests/boxSales.integration.test.ts` | Box sales routes | — |
+| `tests/upsellSales.integration.test.ts` | Upsell sales routes | — |
 | `Dockerfile` | Container image API | `docker-compose.yml` |
 
 **Зависимости между слоями API:**
@@ -176,8 +185,14 @@ routes/integrations.ts → instancesRepository, integrationTimeout, apiResponse
 | Файл | Назначение | Статус |
 |------|------------|--------|
 | `src/main.tsx` | React root + Router | implemented |
-| `src/App.tsx` | Routes: `/`, `/login`, fallback → `/` | stub pages |
-| `src/pages/PlaceholderPage.tsx` | Home placeholder | Chunk 0 |
+| `src/App.tsx` | Routes: login, dashboard, sales pages | implemented |
+| `src/layouts/AppLayout.tsx` | Sidebar shell + logout | Chunk 4 |
+| `src/features/auth/*` | Token storage, protected routes | Chunk 4 |
+| `src/pages/LoginPage.tsx` | Login form → `/auth/login` | Chunk 4 |
+| `src/pages/DashboardPage.tsx` | Operator home | Chunk 4 |
+| `src/pages/sales/*` | Box/upsell list + create forms | Chunk 4 |
+| `src/lib/apiClient.ts` | Fetch wrapper with JWT | Chunk 4 |
+| `src/pages/PlaceholderPage.tsx` | Legacy placeholder (unused) | Chunk 0 |
 | `vite.config.mjs` | Dev server :5174, proxy `/api` и `/status` → API | implemented |
 | `Dockerfile` | Container image Web | optional full Docker |
 
@@ -258,6 +273,16 @@ parseActivationEnvelope(code)  →  ParsedActivationEnvelope (dot / JSON variant
 | PATCH | `/api/v1/instances/:id` | **implemented** | `modules/instances/` | Box ID 24 char |
 | POST | `/api/v1/integrations/instances/:id/rotate-token` | **implemented** | `modules/instances/` | JWT auth, display-once |
 | POST | `/api/v1/integrations/verify-instance-token` | **implemented** | `routes/integrations.ts` | Auth: `X-Instance-Token`; timeout 3s |
+| GET | `/api/v1/box-sales` | **implemented** | `modules/boxSales/` | filters, pagination, customer summary |
+| POST | `/api/v1/box-sales` | **implemented** | `modules/boxSales/` | optional `createInstance` |
+| GET | `/api/v1/box-sales/:id` | **implemented** | `modules/boxSales/` | detail |
+| PATCH | `/api/v1/box-sales/:id` | **implemented** | `modules/boxSales/` | partial update |
+| GET | `/api/v1/box-sales/stats` | **implemented** | `modules/boxSales/` | count/revenue/byPackage |
+| GET | `/api/v1/upsell-sales` | **implemented** | `modules/upsellSales/` | filters, pagination |
+| POST | `/api/v1/upsell-sales` | **implemented** | `modules/upsellSales/` | SKU catalog validation |
+| GET | `/api/v1/upsell-sales/:id` | **implemented** | `modules/upsellSales/` | detail |
+| PATCH | `/api/v1/upsell-sales/:id` | **implemented** | `modules/upsellSales/` | partial update |
+| GET | `/api/v1/upsell-sales/stats` | **implemented** | `modules/upsellSales/` | count/revenue/byCategory/bySku |
 | POST | `/api/v1/integrations/verify-code` | **stub 501** | `routes/integrations.ts` | Chunk 7 |
 | POST | `/api/v1/integrations/support/messages` | **stub 501** | `routes/integrations.ts` | Chunk 7 |
 
@@ -328,7 +353,7 @@ parseActivationEnvelope(code)  →  ParsedActivationEnvelope (dot / JSON variant
 
 | Файл | Таблицы | Chunk |
 |------|---------|-------|
-| `apps/api/db/migrations/001_skeleton.sql` | `instances` | 0 |
+| `apps/api/db/migrations/001_initial.sql` | full schema (`users`, `customers`, `instances`, sales, licenses, support) | 2 |
 
 ### Таблица `instances` (Chunk 0)
 
@@ -479,15 +504,16 @@ corepack pnpm smoke        # scripts/smoke.ps1
 
 ## 10. Roadmap
 
-Полный backlog: [`TODO.md`](TODO.md) · активный спринт: [`IMPLEMENTATION_SPRINT_2.md`](IMPLEMENTATION_SPRINT_2.md).
+Полный backlog: [`TODO.md`](TODO.md) · последний спринт: [`IMPLEMENTATION_SPRINT_3.md`](IMPLEMENTATION_SPRINT_3.md).
 
 | Chunk | Название | Статус в коде | Ключевые артеfacts |
 |:-----:|----------|:-------------:|---------------------|
 | 0 | Monorepo skeleton + verify-instance-token | **implemented** | docker, verify-token |
 | 1 | `packages/license-signing` | **implemented** | sign, verify, parse, tests |
-| 2 | API: config, db, auth | **implemented** | JWT auth, mysql2 pool, `001_initial.sql` |
+| 2 | API: config, db, auth | **implemented** | JWT auth, phased Drizzle adoption (`db/schema.ts`, `getDrizzleDb`), `001_initial.sql` |
 | 3 | customers, instances | **implemented** | CRUD, token display-once, rotate |
-| 4–12 | sales, pricing, codes, UI, audit | planned | см. `VENDOR_ADMIN_SPEC.md` §18 |
+| 4 | boxSales, upsellSales, web shell | **implemented** | sales API + operator UI |
+| 5–12 | pricing, codes, support, audit | planned | см. `VENDOR_ADMIN_SPEC.md` §18 |
 
 > **Примечание:** [`TODO.md`](TODO.md) — чеклист backlog с `[ ]`/`[x]`; сводная таблица там может отставать. **Источник истины по коду** — §2–§3 этого handbook.
 

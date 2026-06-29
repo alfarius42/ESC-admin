@@ -3,8 +3,8 @@
 > **Обновляй статус:** `[ ]` → `[x]` при закрытии. Архив выполненного — `docs/archive/`.  
 > **Канон:** `VENDOR_ADMIN_SPEC.md`, скелетон — `ADMIN_SKELETON_SPEC.md`, интеграция — `VENDOR_INTEGRATION.md`.  
 > **Порядок:** чанки 0→12 последовательно; после каждого — `pnpm test:run`.
-> **Активный спринт:** [`IMPLEMENTATION_SPRINT_2.md`](IMPLEMENTATION_SPRINT_2.md) (Chunk 2 → Chunk 3).  
-> **Sprint 1 (закрыт):** [`IMPLEMENTATION_NEAREST_TASKS.md`](IMPLEMENTATION_NEAREST_TASKS.md) (Chunk 0 → Chunk 1).
+> **Активный спринт:** [`IMPLEMENTATION_SPRINT_3.md`](IMPLEMENTATION_SPRINT_3.md) (Chunk 4 + Web Shell) — completed.  
+> **Sprint 2 (закрыт):** [`IMPLEMENTATION_SPRINT_2.md`](IMPLEMENTATION_SPRINT_2.md) (Chunk 2 → Chunk 3).  
 
 ---
 
@@ -16,17 +16,17 @@
 | 1 | `packages/license-signing` | ✅ |
 | 2 | API: config, db, auth | ✅ |
 | 3 | customers, instances | ✅ |
-| 4 | boxSales, upsellSales | ⬜ |
+| 4 | boxSales, upsellSales | ✅ |
 | 5 | priceLists + import-canon | ⬜ |
 | 6 | licenses, codes (issue + verify) | ⬜ |
 | 7 | dashboard, public API, integration, support API | ⬜ |
-| 8 | web shell (layout, auth) | ⬜ |
+| 8 | web shell (layout, auth) | ✅ |
 | 9 | sales UI + instance Box ID | ⬜ |
 | 10 | pricing, codes, SupportInbox | ⬜ |
 | 11 | audit log, support e2e | ⬜ |
 | 12 | README, интеграционная документация | ⬜ |
 
-**Текущая фаза репо:** Chunk 3 закрыт (auth + customers + instances API). Следующий — Chunk 4 (sales).
+**Текущая фаза репо:** Chunk 4 закрыт (sales API + operator UI shell). Следующий — Chunk 5 (price lists).
 
 ---
 
@@ -135,7 +135,7 @@
 
 - [x] Миграция `001_initial.sql` — все таблицы §10 (users, customers, instances, price_lists, box_sales, licenses, activation_codes, audit_log, support_*)
 - [x] Seed admin user (`db:seed`) — один user `admin@vendor.local`
-- [x] mysql2 typed repositories + `db/client.ts` (Drizzle deferred)
+- [x] ORM phased adoption: Drizzle + `db/schema.ts`; migrated repositories: `auth`, `customers`, `instances` (core/token paths)
 - [x] Scripts: `db:migrate`, `db:seed`
 
 ### 2.2 Config и middleware
@@ -197,29 +197,30 @@
 
 ### 4.1 SKU catalog (constants)
 
-- [ ] Пакеты: `regpoint_point`, `regpoint_promo`, `regpoint_pro`, `regpoint_ticket` §6.1
-- [ ] Апсейлы: LIC-UP-*, DEP-*, DEV-*, SUP-*, LEG-* §6.2
-- [ ] Маппинг SKU → modules §6.3
+- [x] Пакеты: `regpoint_point`, `regpoint_promo`, `regpoint_pro`, `regpoint_ticket` §6.1
+- [x] Апсейлы: core subset (LIC-UP-*, DEP-*, DEV-*, SUP-*, LEG-*) §6.2
+- [x] Маппинг SKU → modules §6.3
 
 ### 4.2 Box sales module
 
-- [ ] `GET /box-sales` — filters, pagination, stats aggregate
-- [ ] `POST /box-sales` — customerId, packageSku, soldPriceRub (string decimal), soldAt, contractRef, createInstance, notes
-- [ ] Auto: listPriceRub из price list, modules из SKU
-- [ ] `createInstance=true` → auto-create instance + optional token
-- [ ] `GET /box-sales/:id`, `PATCH /box-sales/:id`
-- [ ] `GET /box-sales/stats` — count by package, revenue
+- [x] `GET /box-sales` — filters, pagination, stats aggregate
+- [x] `POST /box-sales` — customerId, packageSku, soldPriceRub (string decimal), soldAt, contractRef, createInstance, notes
+- [x] Auto: listPriceRub из SKU catalog, modules из SKU
+- [x] `createInstance=true` → auto-create instance (pending token)
+- [x] `GET /box-sales/:id`, `PATCH /box-sales/:id`
+- [x] `GET /box-sales/stats` — count by package, revenue
 
 ### 4.3 Upsell sales module
 
-- [ ] `GET /upsell-sales`, `POST /upsell-sales`, `GET /:id`, `PATCH /:id`
-- [ ] Поля: sku, skuCategory, title, soldPriceRub, linkedBoxSaleId
-- [ ] `GET /upsell-sales/stats`
+- [x] `GET /upsell-sales`, `POST /upsell-sales`, `GET /:id`, `PATCH /:id`
+- [x] Поля: sku, skuCategory, title, soldPriceRub, linkedBoxSaleId
+- [x] `GET /upsell-sales/stats`
 
 ### 4.4 Тесты
 
-- [ ] `boxSales.integration.test.ts` — create sale, stats count
-- [ ] `pnpm test:run` — green
+- [x] `boxSales.integration.test.ts` — create sale, stats count
+- [x] `upsellSales.integration.test.ts` — create upsell, stats
+- [x] `pnpm test:run` — green
 
 ---
 

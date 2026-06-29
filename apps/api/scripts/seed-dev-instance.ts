@@ -43,32 +43,23 @@ try {
   const [customerIdColumnRows] = await connection.query<{ Field: string }[]>(
     "SHOW COLUMNS FROM instances LIKE 'customer_id'"
   );
-
-  if (customerIdColumnRows.length > 0) {
-    await connection.execute(
-      `INSERT INTO instances (
-        id, customer_id, runtime_instance_id, integration_token_hash, instance_status
-      ) VALUES (?, ?, ?, ?, 'active')
-      ON DUPLICATE KEY UPDATE
-        customer_id = VALUES(customer_id),
-        runtime_instance_id = VALUES(runtime_instance_id),
-        integration_token_hash = VALUES(integration_token_hash),
-        instance_status = 'active'`,
-      [randomUUID(), defaultCustomerId, runtimeInstanceId, tokenHash]
-    );
-  } else {
-    // Backward compatibility for old local DB created before 001_initial.
-    await connection.execute(
-      `INSERT INTO instances (
-        id, runtime_instance_id, integration_token_hash, instance_status
-      ) VALUES (?, ?, ?, 'active')
-      ON DUPLICATE KEY UPDATE
-        runtime_instance_id = VALUES(runtime_instance_id),
-        integration_token_hash = VALUES(integration_token_hash),
-        instance_status = 'active'`,
-      [randomUUID(), runtimeInstanceId, tokenHash]
+  if (customerIdColumnRows.length === 0) {
+    throw new Error(
+      "instances.customer_id is missing. Run `corepack pnpm db:reset`, then `db:migrate`, `db:seed`, `db:seed-dev`."
     );
   }
+
+  await connection.execute(
+    `INSERT INTO instances (
+      id, customer_id, runtime_instance_id, integration_token_hash, instance_status
+    ) VALUES (?, ?, ?, ?, 'active')
+    ON DUPLICATE KEY UPDATE
+      customer_id = VALUES(customer_id),
+      runtime_instance_id = VALUES(runtime_instance_id),
+      integration_token_hash = VALUES(integration_token_hash),
+      instance_status = 'active'`,
+    [randomUUID(), defaultCustomerId, runtimeInstanceId, tokenHash]
+  );
 
   console.log("Dev instance seeded");
   console.log(`runtimeInstanceId: ${runtimeInstanceId}`);

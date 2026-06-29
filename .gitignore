@@ -5,6 +5,7 @@ node_modules/
 # Build
 dist/
 build/
+.vite/
 *.tsbuildinfo
 apps/web/vite.config.js
 

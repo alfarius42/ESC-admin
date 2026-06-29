@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
-import type { RowDataPacket } from "mysql2";
-import { getDbPool } from "../../db/client.js";
+import { and, desc, eq, like, or, sql, type SQL } from "drizzle-orm";
+import { getDrizzleDb } from "../../db/client.js";
+import { customers, instances } from "../../db/schema.js";
 
 export type CustomerRecord = {
   id: string;
@@ -14,29 +15,33 @@ export type CustomerRecord = {
   updatedAt: string;
 };
 
-type CustomerRow = RowDataPacket & {
+function mapRow(row: {
   id: string;
-  legal_name: string;
+  legalName: string;
   inn: string | null;
-  contact_name: string | null;
-  contact_email: string | null;
-  contact_phone: string | null;
+  contactName: string | null;
+  contactEmail: string | null;
+  contactPhone: string | null;
   notes: string | null;
-  created_at: Date;
-  updated_at: Date;
-};
-
-function mapRow(row: CustomerRow): CustomerRecord {
+  createdAt: Date | string;
+  updatedAt: Date | string;
+}): CustomerRecord {
   return {
     id: row.id,
-    legalName: row.legal_name,
+    legalName: row.legalName,
     inn: row.inn,
-    contactName: row.contact_name,
-    contactEmail: row.contact_email,
-    contactPhone: row.contact_phone,
+    contactName: row.contactName,
+    contactEmail: row.contactEmail,
+    contactPhone: row.contactPhone,
     notes: row.notes,
-    createdAt: row.created_at.toISOString(),
-    updatedAt: row.updated_at.toISOString()
+    createdAt:
+      row.createdAt instanceof Date
+        ? row.createdAt.toISOString()
+        : new Date(row.createdAt).toISOString(),
+    updatedAt:
+      row.updatedAt instanceof Date
+        ? row.updatedAt.toISOString()
+        : new Date(row.updatedAt).toISOString()
   };
 }
 
@@ -45,52 +50,73 @@ export async function listCustomers(params: {
   offset: number;
   limit: number;
 }): Promise<{ items: CustomerRecord[]; total: number }> {
-  const db = getDbPool();
-  const conditions: string[] = [];
-  const values: string[] = [];
+  const db = getDrizzleDb();
+  const conditions: SQL<unknown>[] = [];
 
   if (params.q?.trim()) {
     const term = `%${params.q.trim()}%`;
     conditions.push(
-      "(legal_name LIKE ? OR inn LIKE ? OR contact_email LIKE ?)"
+      or(
+        like(customers.legalName, term),
+        like(customers.inn, term),
+        like(customers.contactEmail, term)
+      )!
     );
-    values.push(term, term, term);
   }
 
-  const whereClause =
-    conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+  const whereExpr = conditions.length > 0 ? and(...conditions) : undefined;
 
-  const [countRows] = await db.execute<RowDataPacket[]>(
-    `SELECT COUNT(*) AS total FROM customers ${whereClause}`,
-    values
-  );
+  const countRows = await db
+    .select({ total: sql<number>`count(*)` })
+    .from(customers)
+    .where(whereExpr);
   const total = Number(countRows[0]?.total ?? 0);
 
-  const [rows] = await db.execute<CustomerRow[]>(
-    `SELECT id, legal_name, inn, contact_name, contact_email, contact_phone, notes, created_at, updated_at
-     FROM customers
-     ${whereClause}
-     ORDER BY created_at DESC
-     LIMIT ? OFFSET ?`,
-    [...values, String(params.limit), String(params.offset)]
-  );
+  const rows = await db
+    .select({
+      id: customers.id,
+      legalName: customers.legalName,
+      inn: customers.inn,
+      contactName: customers.contactName,
+      contactEmail: customers.contactEmail,
+      contactPhone: customers.contactPhone,
+      notes: customers.notes,
+      createdAt: customers.createdAt,
+      updatedAt: customers.updatedAt
+    })
+    .from(customers)
+    .where(whereExpr)
+    .orderBy(desc(customers.createdAt))
+    .limit(params.limit)
+    .offset(params.offset);
 
   return { items: rows.map(mapRow), total };
 }
 
 export async function findCustomerById(id: string): Promise<CustomerRecord | null> {
-  const db = getDbPool();
-  const [rows] = await db.execute<CustomerRow[]>(
-    `SELECT id, legal_name, inn, contact_name, contact_email, contact_phone, notes, created_at, updated_at
-     FROM customers WHERE id = ? LIMIT 1`,
-    [id]
-  );
+  const db = getDrizzleDb();
+  const rows = await db
+    .select({
+      id: customers.id,
+      legalName: customers.legalName,
+      inn: customers.inn,
+      contactName: customers.contactName,
+      contactEmail: customers.contactEmail,
+      contactPhone: customers.contactPhone,
+      notes: customers.notes,
+      createdAt: customers.createdAt,
+      updatedAt: customers.updatedAt
+    })
+    .from(customers)
+    .where(eq(customers.id, id))
+    .limit(1);
 
-  if (rows.length === 0) {
+  const row = rows[0];
+  if (!row) {
     return null;
   }
 
-  return mapRow(rows[0]);
+  return mapRow(row);
 }
 
 export async function createCustomer(data: {
@@ -101,22 +127,20 @@ export async function createCustomer(data: {
   contactPhone: string | null;
   notes: string | null;
 }): Promise<CustomerRecord> {
-  const db = getDbPool();
+  const db = getDrizzleDb();
   const id = randomUUID();
 
-  await db.execute(
-    `INSERT INTO customers (id, legal_name, inn, contact_name, contact_email, contact_phone, notes)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    [
-      id,
-      data.legalName,
-      data.inn,
-      data.contactName,
-      data.contactEmail,
-      data.contactPhone,
-      data.notes
-    ]
-  );
+  await db.insert(customers).values({
+    id,
+    legalName: data.legalName,
+    inn: data.inn,
+    contactName: data.contactName,
+    contactEmail: data.contactEmail,
+    contactPhone: data.contactPhone,
+    notes: data.notes,
+    createdAt: sql`UTC_TIMESTAMP()`,
+    updatedAt: sql`UTC_TIMESTAMP()`
+  });
 
   const created = await findCustomerById(id);
   if (!created) {
@@ -142,26 +166,21 @@ export async function updateCustomer(
     return null;
   }
 
-  const db = getDbPool();
-  await db.execute(
-    `UPDATE customers SET
-       legal_name = ?,
-       inn = ?,
-       contact_name = ?,
-       contact_email = ?,
-       contact_phone = ?,
-       notes = ?
-     WHERE id = ?`,
-    [
-      data.legalName ?? existing.legalName,
-      data.inn !== undefined ? data.inn : existing.inn,
-      data.contactName !== undefined ? data.contactName : existing.contactName,
-      data.contactEmail !== undefined ? data.contactEmail : existing.contactEmail,
-      data.contactPhone !== undefined ? data.contactPhone : existing.contactPhone,
-      data.notes !== undefined ? data.notes : existing.notes,
-      id
-    ]
-  );
+  const db = getDrizzleDb();
+  await db
+    .update(customers)
+    .set({
+      legalName: data.legalName ?? existing.legalName,
+      inn: data.inn !== undefined ? data.inn : existing.inn,
+      contactName: data.contactName !== undefined ? data.contactName : existing.contactName,
+      contactEmail:
+        data.contactEmail !== undefined ? data.contactEmail : existing.contactEmail,
+      contactPhone:
+        data.contactPhone !== undefined ? data.contactPhone : existing.contactPhone,
+      notes: data.notes !== undefined ? data.notes : existing.notes,
+      updatedAt: sql`UTC_TIMESTAMP()`
+    })
+    .where(eq(customers.id, id));
 
   return findCustomerById(id);
 }
@@ -174,24 +193,22 @@ export async function listInstancesForCustomer(customerId: string): Promise<
     hostname: string | null;
   }>
 > {
-  const db = getDbPool();
-  type InstanceRow = RowDataPacket & {
-    id: string;
-    runtime_instance_id: string | null;
-    instance_status: string;
-    hostname: string | null;
-  };
-
-  const [rows] = await db.execute<InstanceRow[]>(
-    `SELECT id, runtime_instance_id, instance_status, hostname
-     FROM instances WHERE customer_id = ? ORDER BY created_at DESC`,
-    [customerId]
-  );
+  const db = getDrizzleDb();
+  const rows = await db
+    .select({
+      id: instances.id,
+      runtimeInstanceId: instances.runtimeInstanceId,
+      instanceStatus: instances.instanceStatus,
+      hostname: instances.hostname
+    })
+    .from(instances)
+    .where(eq(instances.customerId, customerId))
+    .orderBy(desc(instances.createdAt));
 
   return rows.map((row) => ({
     id: row.id,
-    runtimeInstanceId: row.runtime_instance_id,
-    instanceStatus: row.instance_status,
+    runtimeInstanceId: row.runtimeInstanceId,
+    instanceStatus: row.instanceStatus,
     hostname: row.hostname
   }));
 }
