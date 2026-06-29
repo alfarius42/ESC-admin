@@ -6,6 +6,7 @@ node_modules/
 dist/
 build/
 *.tsbuildinfo
+apps/web/vite.config.js
 
 # Environment & secrets
 .env
@@ -37,6 +38,7 @@ coverage/
 
 # Docker
 pgdata/
+mysqldata/
 
 # Cursor local (keep .cursor/rules in repo)
 .cursor/*

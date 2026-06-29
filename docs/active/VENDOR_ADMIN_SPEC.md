@@ -31,7 +31,7 @@
 ```text
 Создай monorepo regpoint-vendor-admin по docs/active/VENDOR_ADMIN_SPEC.md:
 §14 структура, §15 SQL migration, §18 .env.example, §19 docker-compose, §26 package.json scripts.
-Stack: Node 20, Express 4, TS, PostgreSQL 16, React 18, Vite 5, Tailwind v4.
+Stack: Node 20, Express 4, TS, MySQL 8, React 18, Vite 5, Tailwind v4.
 ```
 
 ---
@@ -109,7 +109,7 @@ ESC-Promo/ (клиент)
 | Runtime | Node.js 20 |
 | API | Express 4, TypeScript 5.3 |
 | ORM | Drizzle ORM или Knex (на выбор; схема — §15) |
-| DB | PostgreSQL 16 |
+| DB | MySQL 8 |
 | Frontend | React 18, Vite 5, TypeScript, Tailwind v4 |
 | Auth | JWT (httpOnly cookie optional; MVP — Bearer header) |
 | Password | bcrypt, cost 12 |
@@ -830,7 +830,44 @@ Returns 200 only if DB ok; 503 otherwise.
 ### 8.13 Integration API (коробка → vendor-admin)
 
 > Полная модель: `VENDOR_INTEGRATION.md`.  
+> **Жёсткая граница (periodic online):** `ADMIN_SKELETON_SPEC.md` §3 — только `verify-instance-token`.  
 > **Per-instance token** выпускает vendor-admin при создании инстанса; support копирует в `.env` коробки.
+
+#### POST `/integrations/verify-instance-token` — **MVP (skeleton + Chunk 7)**
+
+Header: `X-Instance-Token: <plain-token-from-admin>`
+
+```json
+{
+  "runtimeInstanceId": "a1b2c3d4e5f6g7h8i9j0k1l2",
+  "productVersion": "1.0.0",
+  "licenseStatus": "active",
+  "validUntil": "2027-06-14T23:59:59.000Z",
+  "reportedAt": "2026-06-29T10:00:00.000Z"
+}
+```
+
+Response `200`:
+
+```json
+{
+  "success": true,
+  "data": {
+    "tokenValid": true,
+    "instanceRegistered": true,
+    "licenseActive": true,
+    "validUntil": "2027-06-14T23:59:59.000Z",
+    "modules": ["pro"],
+    "nextCheckAfterDays": 30,
+    "warnings": []
+  },
+  "error": null
+}
+```
+
+Errors: `401 INVALID_INSTANCE_TOKEN`, `403 INSTANCE_SUSPENDED`, `404 INSTANCE_NOT_FOUND`.
+
+**Коробка:** первый старт + не чаще 1 раз / 30 суток; timeout 3s; offline-first — см. `VENDOR_INTEGRATION.md` §4.3.
 
 #### POST `/integrations/verify-code` — **MVP**
 
@@ -1350,8 +1387,10 @@ regpoint-vendor-admin/
 # apps/api
 NODE_ENV=development
 PORT=4000
+MYSQL_HOST_PORT=3307
+WEB_PORT=5174
 VENDOR_ADMIN_PUBLIC_URL=http://localhost:4000
-DATABASE_URL=postgresql://vendor:vendor@localhost:5433/regpoint_vendor
+DATABASE_URL=mysql://vendor:vendor@localhost:3307/regpoint_vendor
 JWT_SECRET=change-me-min-32-chars
 JWT_EXPIRES_IN=24h
 
@@ -1371,8 +1410,8 @@ INTEGRATION_CALLBACK_SECRET=
 SEED_ADMIN_EMAIL=admin@vendor.local
 # SEED_ADMIN_PASSWORD=  # dev only — prod leave unset
 
-# apps/web
-VITE_API_URL=http://localhost:4000/api/v1
+# apps/web — Vite proxy /api → localhost:PORT
+VITE_API_URL=/api/v1
 ```
 
 **Generate keypair:**
@@ -1390,40 +1429,41 @@ openssl pkey -in license-private.pem -pubout -out license-public.pem
 
 ```yaml
 services:
-  postgres:
-    image: postgres:16-alpine
+  mysql:
+    image: mysql:8
     environment:
-      POSTGRES_USER: vendor
-      POSTGRES_PASSWORD: vendor
-      POSTGRES_DB: regpoint_vendor
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: regpoint_vendor
+      MYSQL_USER: vendor
+      MYSQL_PASSWORD: vendor
     ports:
-      - "5433:5432"
+      - "${MYSQL_HOST_PORT:-3307}:3306"
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - mysqldata:/var/lib/mysql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U vendor"]
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u$${MYSQL_USER} -p$${MYSQL_PASSWORD} --silent"]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
 
   api:
     build: ./apps/api
     ports:
-      - "4000:4000"
+      - "${PORT:-4000}:${PORT:-4000}"
     env_file: .env
     depends_on:
-      postgres:
+      mysql:
         condition: service_healthy
 
   web:
     build: ./apps/web
     ports:
-      - "5174:80"
+      - "${WEB_PORT:-5174}:${WEB_PORT:-5174}"
     depends_on:
       - api
 
 volumes:
-  pgdata:
+  mysqldata:
 ```
 
 ---
@@ -1531,7 +1571,7 @@ export type { ActivationPayload, ActivationEnvelope, ProductModule, CodeType, Pa
 
 | Chunk | Промпт | Результат |
 |-------|--------|-----------|
-| 0 | §0 стартовый | monorepo skeleton, docker, migrate |
+| 0 | `ADMIN_SKELETON_SPEC.md` §8 промпт | monorepo skeleton, verify-instance-token, docker |
 | 1 | «Реализуй packages/license-signing по §7, §15» | signing package + tests |
 | 2 | «Реализуй apps/api: config, db, middleware, auth по §5.1, §8.2, §12» | login + requireAuth |
 | 3 | «Модули customers, instances по §8.4–8.5, §9 routes» | CRUD |

@@ -1,0 +1,24 @@
+{
+  "name": "esc-admin",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@10.12.4",
+  "scripts": {
+    "dev": "corepack pnpm -r --parallel dev",
+    "dev:api": "corepack pnpm --filter @esc-admin/api dev",
+    "dev:web": "corepack pnpm --filter @esc-admin/web dev",
+    "build": "corepack pnpm -r build",
+    "test:run": "corepack pnpm -r test:run",
+    "check:no-any": "node scripts/check-no-any.mjs",
+    "db:up": "docker compose up -d mysql",
+    "db:down": "docker compose stop mysql",
+    "db:logs": "docker compose logs -f mysql",
+    "db:migrate": "corepack pnpm --filter @esc-admin/api db:migrate",
+    "db:seed": "corepack pnpm --filter @esc-admin/api db:seed",
+    "db:seed-dev": "corepack pnpm --filter @esc-admin/api db:seed-dev",
+    "db:reset": "docker compose down -v; corepack pnpm db:up",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down",
+    "smoke": "powershell -ExecutionPolicy Bypass -File scripts/smoke.ps1"
+  }
+}

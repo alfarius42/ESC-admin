@@ -1,33 +1,70 @@
 ---
-description: Documentation layout, index workflow, reference vs active
-globs: "docs/**/*.md"
-alwaysApply: false
+description: Developer support handbook — layout, module map, human+AI readable docs (always apply)
+alwaysApply: true
 ---
 
-# Documentation
+# Documentation & Developer Handbook
+
+## Primary handbook (обязательно)
+
+**`docs/active/DEVELOPER_HANDBOOK.md`** — единый справочник поддержки для **живого разработчика и ИИ-агента**.
+
+Цель: по одному документу быстро найти **что где лежит**, **что уже реализовано**, **как запустить и проверить**.
+
+### Когда читать handbook
+
+| Ситуация | Действие |
+|----------|----------|
+| Новая задача / onboarding | §0 Quick lookup → нужный § |
+| Правка кода (route, module, env, migration) | Сверить §2–§5 **до** правки |
+| Вопрос «где это в коде?» | §0 или §2, не искать вслепую |
+| После merge / завершения чанка | Обновить затронутые строки в handbook |
+
+### Когда обновлять handbook (в том же PR/сессии)
+
+- новый/изменённый модуль, файл, route, таблица, env-переменная;
+- статус чанка или реализации endpoint;
+- команда запуска, smoke, CI gate, порты, docker.
+
+### Формат: human + AI readable
+
+Handbook **не дублирует** полное ТЗ — даёт **фактическое состояние кода** со ссылкой на канон.
+
+Обязательные элементы в каждом разделе:
+
+1. **Таблица «что → где»** — путь файла, назначение, связанная спека (`docs/active/...`).
+2. **Статус** — `implemented` | `stub` | `planned` (одно слово, без двусмысленности).
+3. **Явные пути** — `apps/api/src/...`, не «в API где-то».
+4. **Quick lookup (§0)** — матрица «вопрос → файл/§» для агента без полного обхода репо.
+5. **Короткие flow** — цепочка файлов для ключевых сценариев (verify-token, sign code).
+6. **Дата в шапке** — обновлять при существенных правках.
+
+Запрещено: vague-описания («логика в сервисе»), дубли §8 `VENDOR_ADMIN_SPEC.md`, устаревшие статусы после изменения кода.
 
 ## Layout
 
 | Path | Purpose |
 |------|---------|
-| `docs/active/` | Admin specs — **source of truth** for this repo |
+| `docs/active/DEVELOPER_HANDBOOK.md` | **Module map + ops** — поддержка и onboarding |
+| `docs/active/` | Admin specs — **source of truth** for product/API design |
 | `docs/reference/esc-promo/` | **Read-only copies** of ESC-Promo product docs |
 | `docs/archive/` | Superseded admin docs |
-| `docs/active/DOCUMENTATION_INDEX.md` | Full index — update on every new doc |
+| `docs/active/DOCUMENTATION_INDEX.md` | Full doc index — update on every new doc |
 | `CURSOR_CONTEXT.md` | Lightweight index — update for key docs |
 
 ## Reference vs Active
 
-- **Active** — пишем и правим здесь (`VENDOR_ADMIN_SPEC`, `VENDOR_INTEGRATION`, `TODO`).
+- **Active** — пишем и правим здесь (`VENDOR_ADMIN_SPEC`, `VENDOR_INTEGRATION`, `TODO`, `DEVELOPER_HANDBOOK`).
 - **Reference** — снимок коробки; синхронизация из `ESC-Promo/docs/active/` (см. `docs/reference/esc-promo/README.md`).
 - Не дублировать между active и reference: admin-ТЗ только в active; API/архитектура коробки — только в reference.
+- Handbook **не заменяет** `VENDOR_ADMIN_SPEC.md` §8 — фиксирует **фактическое состояние кода**.
 
 ## New Documents
 
 - Filename: `SCREAMING_SNAKE.md` in `docs/active/`
-- Header: status, related files
-- Add entry to `DOCUMENTATION_INDEX.md` and при необходимости `CURSOR_CONTEXT.md`
+- Header: status, related files, «см. также DEVELOPER_HANDBOOK §…»
+- Add entry to `DOCUMENTATION_INDEX.md`, `CURSOR_CONTEXT.md`, и при необходимости раздел в `DEVELOPER_HANDBOOK.md`
 
 ## Process
 
-Docs before code — см. `development-process.mdc`.
+Docs before code — см. `development-process.mdc`. Handbook — после кода в том же изменении.

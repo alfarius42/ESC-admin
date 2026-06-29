@@ -1,0 +1,46 @@
+services:
+  mysql:
+    image: mysql:8
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: regpoint_vendor
+      MYSQL_USER: vendor
+      MYSQL_PASSWORD: vendor
+    ports:
+      - "${MYSQL_HOST_PORT:-3307}:3306"
+    volumes:
+      - mysqldata:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u$${MYSQL_USER} -p$${MYSQL_PASSWORD} --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: ./apps/api/Dockerfile
+    env_file: .env
+    environment:
+      DATABASE_URL: mysql://vendor:vendor@mysql:3306/regpoint_vendor
+    ports:
+      - "${PORT:-4000}:${PORT:-4000}"
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  web:
+    build:
+      context: .
+      dockerfile: ./apps/web/Dockerfile
+    env_file: .env
+    environment:
+      API_PROXY_TARGET: http://api:4000
+      PORT: 4000
+    ports:
+      - "${WEB_PORT:-5174}:${WEB_PORT:-5174}"
+    depends_on:
+      - api
+
+volumes:
+  mysqldata:

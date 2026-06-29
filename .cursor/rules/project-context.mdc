@@ -35,6 +35,11 @@ apps/web          # React SPA
 
 Только в ESC-Promo (не копируем): `SUPPORT_CHAT.md`, `BUSINESS_MODEL.md`, `PRODUCT_LINE.md`
 
+## Developer Handbook (support map)
+
+**`docs/active/DEVELOPER_HANDBOOK.md`** — module map, API status, env, DB, runbook.  
+Обновлять при изменении кода. Human + AI readable. Always apply: `.cursor/rules/documentation.mdc`.
+
 ## Generation Order
 
 Follow chunk plan in `docs/active/VENDOR_ADMIN_SPEC.md` §18; run `pnpm test:run` after each chunk.
