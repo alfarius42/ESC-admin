@@ -29,12 +29,16 @@
 
 Чанки 0–12 последовательно (`VENDOR_ADMIN_SPEC.md` §18). После чанка — `pnpm test:run`.
 
-## Процесс
+## Правила проекта
 
-- **Handbook (module map):** `docs/active/DEVELOPER_HANDBOOK.md` — фактическое состояние кода; обновлять с кодом (`.cursor/rules/documentation.mdc`, always apply)
-- Docs-first → см. `.cursor/rules/development-process.mdc`
-- Git → `.cursor/rules/git-workflow.mdc`
-- Референс ESC-Promo не редактировать — перекопировать из `C:\ESC-Promo\docs\active\`
+| Файл | Назначение |
+|------|------------|
+| `.cursor/rules/project-overview.mdc` | Контекст, API contract, docs index |
+| `.cursor/rules/reference-boundary.mdc` | Read-only референс ESC-Promo |
+| `.cursor/rules/typescript-standards.mdc` | TS, envelope, license signing |
+| `.cursor/rules/git-workflow.mdc` | Remote, ветки, CI (детали — User Rules) |
+
+**Handbook:** `docs/active/DEVELOPER_HANDBOOK.md` — обновлять с кодом.
 
 ## Git
 
@@ -43,4 +47,4 @@ Remote: `https://github.com/alfarius42/ESC-admin`.
 **Ветки:** `feature/*` → PR в `develop` (CI green) → `main` только для production.  
 См. `docs/active/GIT_WORKFLOW.md`, `.cursor/rules/git-workflow.mdc`.
 
-Коммит/push — только по запросу пользователя.
+Коммит/push — только по запросу пользователя (User Rules).

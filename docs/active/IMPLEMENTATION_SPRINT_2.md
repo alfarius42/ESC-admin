@@ -70,7 +70,7 @@
 
 | # | Действие | Файл / артефакт |
 |---|----------|-----------------|
-| 1 | Выбрать ORM: **Drizzle recommended** (зафиксировать в комментарии или decision log в PR) | `apps/api/src/db/client.ts` |
+| 1 | Выбрать ORM: **Drizzle chosen** (phased adoption: `auth` + `customers` + `instances`) | `apps/api/src/db/client.ts`, `apps/api/src/db/schema.ts` |
 | 2 | Подключить typed queries к таблицам `users`, `customers`, `instances` (минимум для auth + chunk 3) | `apps/api/src/db/` |
 | 3 | Убедиться, что migration runner применяет все `.sql` из `apps/api/db/migrations/` | `apps/api/scripts/migrate.ts` |
 

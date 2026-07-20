@@ -59,7 +59,7 @@ beforeAll(async () => {
     password: "admin12345"
   });
   authToken = loginResponse.body.data.token as string;
-});
+}, 30000);
 
 describe("customers routes", () => {
   it("returns 401 without auth token", async () => {

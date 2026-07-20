@@ -67,6 +67,16 @@ corepack pnpm db:seed
 corepack pnpm db:seed-dev
 ```
 
+Если проект запускался до перехода на `001_initial.sql`, сначала сделай reset:
+
+```powershell
+corepack pnpm db:reset
+Start-Sleep -Seconds 15
+corepack pnpm db:migrate
+corepack pnpm db:seed
+corepack pnpm db:seed-dev
+```
+
 ### Каждый день — старт
 
 ```powershell

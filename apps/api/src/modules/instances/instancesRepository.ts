@@ -1,7 +1,17 @@
 import { randomUUID } from "node:crypto";
-import type { RowDataPacket } from "mysql2";
+import { and, count, desc, eq, like, or, sql, type SQL } from "drizzle-orm";
 import { env } from "../../config/environment.js";
-import { getDbPool } from "../../db/client.js";
+import { getDrizzleDb } from "../../db/client.js";
+import { customers, instances, licenses } from "../../db/schema.js";
+
+type InstanceStatus =
+  | "planned"
+  | "deployed"
+  | "active"
+  | "grace"
+  | "expired"
+  | "decommissioned"
+  | "suspended";
 
 export type InstanceRecord = {
   id: string;
@@ -16,19 +26,6 @@ export type InstanceRecord = {
   updatedAt: string;
 };
 
-type InstanceRow = RowDataPacket & {
-  id: string;
-  customer_id: string;
-  runtime_instance_id: string | null;
-  hostname: string | null;
-  deploy_url: string | null;
-  integration_token_hash: string;
-  instance_status: string;
-  notes: string | null;
-  created_at: Date;
-  updated_at: Date;
-};
-
 type VerifyTokenResult = {
   mode: "db" | "env";
   record: {
@@ -38,18 +35,35 @@ type VerifyTokenResult = {
   } | null;
 };
 
-function mapRow(row: InstanceRow): InstanceRecord {
+function mapRow(row: {
+  id: string;
+  customerId: string;
+  runtimeInstanceId: string | null;
+  hostname: string | null;
+  deployUrl: string | null;
+  integrationTokenHash: string;
+  instanceStatus: string;
+  notes: string | null;
+  createdAt: Date | string;
+  updatedAt: Date | string;
+}): InstanceRecord {
   return {
     id: row.id,
-    customerId: row.customer_id,
-    runtimeInstanceId: row.runtime_instance_id,
+    customerId: row.customerId,
+    runtimeInstanceId: row.runtimeInstanceId,
     hostname: row.hostname,
-    deployUrl: row.deploy_url,
-    integrationTokenHash: row.integration_token_hash,
-    instanceStatus: row.instance_status,
+    deployUrl: row.deployUrl,
+    integrationTokenHash: row.integrationTokenHash,
+    instanceStatus: row.instanceStatus,
     notes: row.notes,
-    createdAt: row.created_at.toISOString(),
-    updatedAt: row.updated_at.toISOString()
+    createdAt:
+      row.createdAt instanceof Date
+        ? row.createdAt.toISOString()
+        : new Date(row.createdAt).toISOString(),
+    updatedAt:
+      row.updatedAt instanceof Date
+        ? row.updatedAt.toISOString()
+        : new Date(row.updatedAt).toISOString()
   };
 }
 
@@ -86,32 +100,28 @@ export async function findInstanceByTokenHash(
     };
   }
 
-  const db = getDbPool();
-  type TokenLookupRow = RowDataPacket & {
-    id: string;
-    runtime_instance_id: string | null;
-    instance_status: string;
-  };
+  const db = getDrizzleDb();
+  const rows = await db
+    .select({
+      id: instances.id,
+      runtimeInstanceId: instances.runtimeInstanceId,
+      instanceStatus: instances.instanceStatus
+    })
+    .from(instances)
+    .where(eq(instances.integrationTokenHash, tokenHash))
+    .limit(1);
 
-  const [rows] = await db.execute<TokenLookupRow[]>(
-    `SELECT id, runtime_instance_id, instance_status
-     FROM instances
-     WHERE integration_token_hash = ?
-     LIMIT 1`,
-    [tokenHash]
-  );
-
-  if (rows.length === 0) {
+  const row = rows[0];
+  if (!row) {
     return { mode: "db", record: null };
   }
 
-  const row = rows[0];
   return {
     mode: "db",
     record: {
       id: row.id,
-      runtimeInstanceId: row.runtime_instance_id,
-      instanceStatus: row.instance_status
+      runtimeInstanceId: row.runtimeInstanceId,
+      instanceStatus: row.instanceStatus
     }
   };
 }
@@ -121,11 +131,13 @@ export async function markInstanceTokenVerified(instanceId: string): Promise<voi
     return;
   }
 
-  const db = getDbPool();
-  await db.execute(
-    `UPDATE instances SET last_token_verified_at = UTC_TIMESTAMP() WHERE id = ?`,
-    [instanceId]
-  );
+  const db = getDrizzleDb();
+  await db
+    .update(instances)
+    .set({
+      lastTokenVerifiedAt: sql`UTC_TIMESTAMP()`
+    })
+    .where(eq(instances.id, instanceId));
 }
 
 export async function listInstances(params: {
@@ -135,67 +147,86 @@ export async function listInstances(params: {
   offset: number;
   limit: number;
 }): Promise<{ items: InstanceRecord[]; total: number }> {
-  const db = getDbPool();
-  const conditions: string[] = [];
-  const values: string[] = [];
+  const db = getDrizzleDb();
+  const conditions: SQL<unknown>[] = [];
 
   if (params.status?.trim()) {
-    conditions.push("i.instance_status = ?");
-    values.push(params.status.trim());
+    conditions.push(eq(instances.instanceStatus, params.status.trim() as InstanceStatus));
   }
 
   if (params.customerId?.trim()) {
-    conditions.push("i.customer_id = ?");
-    values.push(params.customerId.trim());
+    conditions.push(eq(instances.customerId, params.customerId.trim()));
   }
 
   if (params.q?.trim()) {
     const term = `%${params.q.trim()}%`;
     conditions.push(
-      "(i.runtime_instance_id LIKE ? OR i.hostname LIKE ? OR i.deploy_url LIKE ? OR c.legal_name LIKE ?)"
+      or(
+        like(instances.runtimeInstanceId, term),
+        like(instances.hostname, term),
+        like(instances.deployUrl, term),
+        like(customers.legalName, term)
+      )!
     );
-    values.push(term, term, term, term);
   }
 
-  const whereClause =
-    conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
-  const fromClause = params.q?.trim()
-    ? "FROM instances i INNER JOIN customers c ON c.id = i.customer_id"
-    : "FROM instances i";
+  const whereExpr = conditions.length > 0 ? and(...conditions) : undefined;
 
-  const [countRows] = await db.execute<RowDataPacket[]>(
-    `SELECT COUNT(*) AS total ${fromClause} ${whereClause}`,
-    values
-  );
+  const countRows = await db
+    .select({ total: count() })
+    .from(instances)
+    .leftJoin(customers, eq(customers.id, instances.customerId))
+    .where(whereExpr);
   const total = Number(countRows[0]?.total ?? 0);
 
-  const [rows] = await db.execute<InstanceRow[]>(
-    `SELECT i.id, i.customer_id, i.runtime_instance_id, i.hostname, i.deploy_url,
-            i.integration_token_hash, i.instance_status, i.notes, i.created_at, i.updated_at
-     ${fromClause}
-     ${whereClause}
-     ORDER BY i.created_at DESC
-     LIMIT ? OFFSET ?`,
-    [...values, String(params.limit), String(params.offset)]
-  );
+  const rows = await db
+    .select({
+      id: instances.id,
+      customerId: instances.customerId,
+      runtimeInstanceId: instances.runtimeInstanceId,
+      hostname: instances.hostname,
+      deployUrl: instances.deployUrl,
+      integrationTokenHash: instances.integrationTokenHash,
+      instanceStatus: instances.instanceStatus,
+      notes: instances.notes,
+      createdAt: instances.createdAt,
+      updatedAt: instances.updatedAt
+    })
+    .from(instances)
+    .leftJoin(customers, eq(customers.id, instances.customerId))
+    .where(whereExpr)
+    .orderBy(desc(instances.createdAt))
+    .limit(params.limit)
+    .offset(params.offset);
 
   return { items: rows.map(mapRow), total };
 }
 
 export async function findInstanceById(id: string): Promise<InstanceRecord | null> {
-  const db = getDbPool();
-  const [rows] = await db.execute<InstanceRow[]>(
-    `SELECT id, customer_id, runtime_instance_id, hostname, deploy_url,
-            integration_token_hash, instance_status, notes, created_at, updated_at
-     FROM instances WHERE id = ? LIMIT 1`,
-    [id]
-  );
+  const db = getDrizzleDb();
+  const rows = await db
+    .select({
+      id: instances.id,
+      customerId: instances.customerId,
+      runtimeInstanceId: instances.runtimeInstanceId,
+      hostname: instances.hostname,
+      deployUrl: instances.deployUrl,
+      integrationTokenHash: instances.integrationTokenHash,
+      instanceStatus: instances.instanceStatus,
+      notes: instances.notes,
+      createdAt: instances.createdAt,
+      updatedAt: instances.updatedAt
+    })
+    .from(instances)
+    .where(eq(instances.id, id))
+    .limit(1);
 
-  if (rows.length === 0) {
+  const row = rows[0];
+  if (!row) {
     return null;
   }
 
-  return mapRow(rows[0]);
+  return mapRow(row);
 }
 
 export async function createInstance(data: {
@@ -207,23 +238,22 @@ export async function createInstance(data: {
   notes: string | null;
   integrationTokenHash: string;
 }): Promise<InstanceRecord> {
-  const db = getDbPool();
+  const db = getDrizzleDb();
   const id = data.id ?? randomUUID();
 
-  await db.execute(
-    `INSERT INTO instances (
-       id, customer_id, hostname, deploy_url, integration_token_hash, instance_status, notes
-     ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    [
-      id,
-      data.customerId,
-      data.hostname,
-      data.deployUrl,
-      data.integrationTokenHash,
-      data.instanceStatus,
-      data.notes
-    ]
-  );
+  await db.insert(instances).values({
+    id,
+    customerId: data.customerId,
+    hostname: data.hostname,
+    deployUrl: data.deployUrl,
+    integrationTokenHash: data.integrationTokenHash,
+    instanceStatus: data.instanceStatus as
+      InstanceStatus,
+    notes: data.notes,
+    integrationTokenIssuedAt: sql`UTC_TIMESTAMP()`,
+    createdAt: sql`UTC_TIMESTAMP()`,
+    updatedAt: sql`UTC_TIMESTAMP()`
+  });
 
   const created = await findInstanceById(id);
   if (!created) {
@@ -248,28 +278,23 @@ export async function updateInstance(
     return null;
   }
 
-  const db = getDbPool();
-  await db.execute(
-    `UPDATE instances SET
-       runtime_instance_id = ?,
-       hostname = ?,
-       deploy_url = ?,
-       instance_status = ?,
-       notes = ?
-     WHERE id = ?`,
-    [
-      data.runtimeInstanceId !== undefined
-        ? data.runtimeInstanceId
-        : existing.runtimeInstanceId,
-      data.hostname !== undefined ? data.hostname : existing.hostname,
-      data.deployUrl !== undefined ? data.deployUrl : existing.deployUrl,
-      data.instanceStatus !== undefined
+  const db = getDrizzleDb();
+  await db
+    .update(instances)
+    .set({
+      runtimeInstanceId:
+        data.runtimeInstanceId !== undefined
+          ? data.runtimeInstanceId
+          : existing.runtimeInstanceId,
+      hostname: data.hostname !== undefined ? data.hostname : existing.hostname,
+      deployUrl: data.deployUrl !== undefined ? data.deployUrl : existing.deployUrl,
+      instanceStatus: (data.instanceStatus !== undefined
         ? data.instanceStatus
-        : existing.instanceStatus,
-      data.notes !== undefined ? data.notes : existing.notes,
-      id
-    ]
-  );
+        : existing.instanceStatus) as InstanceStatus,
+      notes: data.notes !== undefined ? data.notes : existing.notes,
+      updatedAt: sql`UTC_TIMESTAMP()`
+    })
+    .where(eq(instances.id, id));
 
   return findInstanceById(id);
 }
@@ -301,35 +326,25 @@ function parseModulesJson(raw: unknown): string[] {
 export async function findLicenseSummaryByInstanceId(
   instanceId: string
 ): Promise<LicenseSummary | null> {
-  const db = getDbPool();
-  type LicenseRow = RowDataPacket & {
-    license_status: string;
-    modules: unknown;
-    valid_until: Date | string | null;
-  };
-
-  const [rows] = await db.execute<LicenseRow[]>(
-    `SELECT license_status, modules, valid_until
-     FROM licenses
-     WHERE instance_id = ?
-     ORDER BY valid_until DESC
-     LIMIT 1`,
-    [instanceId]
-  );
+  const db = getDrizzleDb();
+  const rows = await db
+    .select({
+      licenseStatus: licenses.licenseStatus,
+      modules: licenses.modules,
+      validUntil: licenses.validUntil
+    })
+    .from(licenses)
+    .where(eq(licenses.instanceId, instanceId))
+    .orderBy(desc(licenses.validUntil))
+    .limit(1);
 
   const row = rows[0];
   if (!row) {
     return null;
   }
 
-  const licenseStatus = String(row.license_status);
-  const validUntilRaw = row.valid_until;
-  const validUntil =
-    validUntilRaw instanceof Date
-      ? validUntilRaw.toISOString().slice(0, 10)
-      : validUntilRaw
-        ? String(validUntilRaw).slice(0, 10)
-        : null;
+  const licenseStatus = String(row.licenseStatus);
+  const validUntil = row.validUntil ? String(row.validUntil).slice(0, 10) : null;
 
   const activeStatuses = new Set(["active", "grace", "issued"]);
   const today = new Date().toISOString().slice(0, 10);
@@ -353,15 +368,16 @@ export async function rotateInstanceToken(
     return null;
   }
 
-  const db = getDbPool();
-  await db.execute(
-    `UPDATE instances SET
-       integration_token_hash = ?,
-       integration_token_rotated_at = UTC_TIMESTAMP(),
-       integration_token_issued_at = UTC_TIMESTAMP()
-     WHERE id = ?`,
-    [newTokenHash, id]
-  );
+  const db = getDrizzleDb();
+  await db
+    .update(instances)
+    .set({
+      integrationTokenHash: newTokenHash,
+      integrationTokenRotatedAt: sql`UTC_TIMESTAMP()`,
+      integrationTokenIssuedAt: sql`UTC_TIMESTAMP()`,
+      updatedAt: sql`UTC_TIMESTAMP()`
+    })
+    .where(eq(instances.id, id));
 
   return findInstanceById(id);
 }
