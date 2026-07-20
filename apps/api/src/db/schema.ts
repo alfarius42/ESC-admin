@@ -4,9 +4,11 @@ import {
   date,
   decimal,
   datetime,
+  int,
   json,
   mysqlEnum,
   mysqlTable,
+  text,
   varchar
 } from "drizzle-orm/mysql-core";
 
@@ -61,11 +63,41 @@ export const customers = mysqlTable("customers", {
   updatedAt: datetime("updated_at").notNull()
 });
 
+export const priceLists = mysqlTable("price_lists", {
+  id: char("id", { length: 36 }).primaryKey(),
+  title: varchar("title", { length: 255 }).notNull(),
+  effectiveFrom: date("effective_from").notNull(),
+  effectiveUntil: date("effective_until"),
+  isPublished: boolean("is_published").notNull().default(false),
+  currency: char("currency", { length: 3 }).notNull().default("RUB"),
+  createdAt: datetime("created_at").notNull(),
+  updatedAt: datetime("updated_at").notNull()
+});
+
+export const priceListItems = mysqlTable("price_list_items", {
+  id: char("id", { length: 36 }).primaryKey(),
+  priceListId: char("price_list_id", { length: 36 }).notNull(),
+  sku: varchar("sku", { length: 50 }).notNull(),
+  itemType: mysqlEnum("item_type", ["package", "upsell", "subscription_renewal"]).notNull(),
+  title: varchar("title", { length: 500 }).notNull(),
+  priceRub: decimal("price_rub", { precision: 12, scale: 2 }),
+  priceNote: varchar("price_note", { length: 255 }),
+  modules: json("modules").notNull(),
+  subscriptionRenewalRub: decimal("subscription_renewal_rub", {
+    precision: 12,
+    scale: 2
+  }),
+  sortOrder: int("sort_order").notNull().default(0)
+});
+
 export const licenses = mysqlTable("licenses", {
   id: char("id", { length: 36 }).primaryKey(),
   instanceId: char("instance_id", { length: 36 }).notNull(),
-  modules: varchar("modules", { length: 65535 }).notNull(),
+  packageSlug: varchar("package_slug", { length: 50 }).notNull(),
+  modules: json("modules").notNull(),
+  validFrom: date("valid_from").notNull(),
   validUntil: date("valid_until").notNull(),
+  subscriptionYear: int("subscription_year").notNull().default(1),
   licenseStatus: mysqlEnum("license_status", [
     "draft",
     "issued",
@@ -75,7 +107,51 @@ export const licenses = mysqlTable("licenses", {
     "revoked"
   ])
     .notNull()
-    .default("draft")
+    .default("draft"),
+  boxSaleId: char("box_sale_id", { length: 36 }),
+  createdAt: datetime("created_at").notNull(),
+  updatedAt: datetime("updated_at").notNull()
+});
+
+export const activationCodes = mysqlTable("activation_codes", {
+  id: char("id", { length: 36 }).primaryKey(),
+  licenseId: char("license_id", { length: 36 }).notNull(),
+  codeType: mysqlEnum("code_type", [
+    "initial",
+    "addon",
+    "renewal",
+    "pilot",
+    "reissue"
+  ]).notNull(),
+  modules: json("modules").notNull(),
+  validUntil: datetime("valid_until"),
+  pilotUntil: datetime("pilot_until"),
+  targetInstanceId: varchar("target_instance_id", { length: 24 }),
+  activationCodeEncrypted: text("activation_code_encrypted").notNull(),
+  codeHashPrefix: varchar("code_hash_prefix", { length: 16 }).notNull(),
+  payloadJson: json("payload_json").notNull(),
+  issuedBy: char("issued_by", { length: 36 }).notNull(),
+  issuedAt: datetime("issued_at").notNull(),
+  activatedAt: datetime("activated_at"),
+  revokedAt: datetime("revoked_at"),
+  codeStatus: mysqlEnum("code_status", [
+    "issued",
+    "activated",
+    "expired",
+    "revoked"
+  ])
+    .notNull()
+    .default("issued")
+});
+
+export const auditLog = mysqlTable("audit_log", {
+  id: char("id", { length: 36 }).primaryKey(),
+  userId: char("user_id", { length: 36 }),
+  action: varchar("action", { length: 100 }).notNull(),
+  entityType: varchar("entity_type", { length: 50 }).notNull(),
+  entityId: char("entity_id", { length: 36 }),
+  diffJson: json("diff_json"),
+  createdAt: datetime("created_at").notNull()
 });
 
 export const boxSales = mysqlTable("box_sales", {

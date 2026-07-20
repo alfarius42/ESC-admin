@@ -17,7 +17,7 @@
 | 2 | API: config, db, auth | ✅ |
 | 3 | customers, instances | ✅ |
 | 4 | boxSales, upsellSales | ✅ |
-| 5 | priceLists + import-canon | ⬜ |
+| 5 | priceLists + import-canon | ✅ |
 | 6 | licenses, codes (issue + verify) | ⬜ |
 | 7 | dashboard, public API, integration, support API | ⬜ |
 | 8 | web shell (layout, auth) | ✅ |
@@ -26,7 +26,7 @@
 | 11 | audit log, support e2e | ⬜ |
 | 12 | README, интеграционная документация | ⬜ |
 
-**Текущая фаза репо:** Chunk 4 закрыт (sales API + operator UI shell). Следующий — Chunk 5 (price lists).
+**Текущая фаза репо:** Chunk 5 закрыт (price lists + import-canon + pricing policy 2026). Следующий — Chunk 6 (licenses/codes, с подключением pilot-eligibility).
 
 ---
 
@@ -230,21 +230,21 @@
 
 ### 5.1 Price lists module
 
-- [ ] `GET /price-lists` — list with publish status
-- [ ] `POST /price-lists` — create draft
-- [ ] `GET /price-lists/:id` — items[]
-- [ ] `PATCH /price-lists/:id` — title, dates
-- [ ] `POST /price-lists/:id/items` — add item (sku, type, price_rub string, modules)
-- [ ] `PATCH /price-lists/:id/items/:itemId`
-- [ ] `DELETE /price-lists/:id/items/:itemId`
-- [ ] `POST /price-lists/:id/publish` — только один published одновременно
-- [ ] `POST /price-lists/import-canon` — импорт 28+ SKU из канона
+- [x] `GET /price-lists` — list with publish status
+- [x] `POST /price-lists` — create draft
+- [x] `GET /price-lists/:id` — items[]
+- [x] `PATCH /price-lists/:id` — title, dates (только draft)
+- [x] `POST /price-lists/:id/items` — add item (sku, type, price_rub string, modules)
+- [x] `PATCH /price-lists/:id/items/:itemId`
+- [x] `DELETE /price-lists/:id/items/:itemId`
+- [x] `POST /price-lists/:id/publish` — только один published одновременно
+- [x] `POST /price-lists/import-canon` — импорт 28+ SKU из канона
 
 ### 5.2 Критерии приёмки Chunk 5
 
-- [ ] Import canon → ≥ 28 price items
-- [ ] Publish → предыдущий published → unpublished
-- [ ] `priceLists.integration.test.ts` — green
+- [x] Import canon → ≥ 28 price items
+- [x] Publish → предыдущий published → unpublished
+- [x] `priceLists.integration.test.ts` — green
 
 ---
 
@@ -261,10 +261,14 @@
 
 ### 6.2 Codes module (issue)
 
-- [ ] `POST /licenses/:id/codes` — codeType: initial | addon | renewal | pilot | reissue
-- [ ] Validation rules §7.3 (duplicate initial blocked, addon merge rules, etc.)
-- [ ] Сроки §7.4: initial/renewal 365d, pilot 30d
-- [ ] Sign через `license-signing`, encrypt at rest §7.6
+- [x] `POST /licenses/:id/codes` — codeType: initial | addon | renewal | pilot | reissue
+- [x] Для `codeType=pilot`: вызывать `GET /customers/:customerId/pilot-eligibility` и блокировать повторный пилот (`409 CONFLICT`)
+- [x] Базовый issue flow: `POST /licenses/:id/codes` возвращает `201`, `activationCode`, `displayOnce`, `emailTemplate`; код сохраняется encrypted в `activation_codes`
+- [x] Validation rules §7.3 (duplicate initial blocked, addon merge rules, etc.)
+- [x] Сроки §7.4: initial/renewal 365d, pilot 30d
+- [ ] Sign через `license-signing` package export (`signPayload`) §7.6
+- [x] Encrypt at rest (`activation_code_encrypted`, AES-256-GCM) §7.6
+- [x] Audit log на `CODE_ISSUED` и `CODE_ISSUE_BLOCKED`
 - [ ] Response: full code **display once** + summary для support
 - [ ] `POST /codes/verify` (admin UI) — parse, verify, lookup, warnings §7.5
 - [ ] `GET /codes` — без full code, только hash prefix + metadata

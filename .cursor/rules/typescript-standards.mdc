@@ -1,5 +1,5 @@
 ---
-description: TypeScript and API conventions for vendor-admin
+description: TypeScript и API conventions для vendor-admin
 globs: "**/*.{ts,tsx}"
 alwaysApply: false
 ---
@@ -11,16 +11,17 @@ alwaysApply: false
 - TypeScript strict; **`any` forbidden**.
 - Files ≤ 1000 lines; split modules by domain (`apps/api/src/modules/*`).
 
-## API Shape
+## API Shape (контракт §8)
 
 ```typescript
-// Envelope for all REST responses
+// Envelope for all REST responses — строго по VENDOR_ADMIN_SPEC.md §8
 { success: true, data: T, error: null }
 { success: false, data: null, error: { code, message, details? } }
 ```
 
 - Money: decimal strings `"180000.00"` (2 places).
 - Dates: ISO 8601 UTC strings.
+- Новые endpoints — только по контракту §8; не выдумывать поля/коды вне спеки.
 
 ## License Signing
 

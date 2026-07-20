@@ -24,7 +24,8 @@
 | Генерация кодовой базы admin | `docs/active/VENDOR_ADMIN_SPEC.md` §0, §18 (чанки) |
 | **Скелетон + граница API ESC-Promo** | `docs/active/ADMIN_SKELETON_SPEC.md` |
 | Backlog MVP | `docs/active/TODO.md` |
-| **Активный спринт (Chunk 5 price lists)** | `docs/active/TODO.md` § Chunk 5 |
+| **Активный спринт (Chunk 6 codes)** | `docs/active/TODO.md` § Chunk 6 |
+| Внедрение цен и пилота (2026) | `docs/active/IMPLEMENTATION_PRICE_POLICY_PILOT.md` |
 | Завершённый Sprint 3 (Chunk 4 + Web Shell) | `docs/active/IMPLEMENTATION_SPRINT_3.md` |
 | Консолидированная миграция sales на Drizzle | `docs/active/DRIZZLE_MIGRATION_SALES.md` |
 | Завершённый Sprint 1 (Chunk 0 → 1) | `docs/active/IMPLEMENTATION_NEAREST_TASKS.md` |
@@ -41,7 +42,7 @@
 
 ### Admin (источник истины — этот репо)
 
-- **`docs/active/DEVELOPER_HANDBOOK.md`** — module map, фактическое состояние кода, env, flows, troubleshooting; обновлять с кодом (`.cursor/rules/documentation.mdc`).
+- **`docs/active/DEVELOPER_HANDBOOK.md`** — module map, фактическое состояние кода, env, flows, troubleshooting; обновлять с кодом (`.cursor/rules/project-overview.mdc`).
 - **`docs/active/ADMIN_SKELETON_SPEC.md`** — Chunk 0 skeleton, жёсткая граница API с ESC-Promo.
 - **`docs/active/VENDOR_ADMIN_SPEC.md`** — полное ТЗ vendor-admin.
 - **`docs/active/VENDOR_INTEGRATION.md`** — offline-first, per-instance token, verify-code.
@@ -69,8 +70,10 @@
 - **`docs/active/DOCUMENTATION_INDEX.md`** — полный индекс.
 - **`docs/active/GIT_WORKFLOW.md`** — feature → develop → main, CI, PR.
 - **`docs/active/GITHUB_RULES.md`** — branch protection, default branch, PR policy.
-- **`.cursor/rules/development-process.mdc`** — docs-first, формат коммитов.
-- **`.cursor/rules/git-workflow.mdc`** — ветки и merge policy.
+- **`.cursor/rules/project-overview.mdc`** — контекст, API contract, docs index.
+- **`.cursor/rules/reference-boundary.mdc`** — read-only референс ESC-Promo.
+- **`.cursor/rules/typescript-standards.mdc`** — TS, envelope, license signing.
+- **`.cursor/rules/git-workflow.mdc`** — remote, ветки, CI.
 
 ---
 

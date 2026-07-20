@@ -1,0 +1,62 @@
+пришли ---
+description: ESC-Admin — точка входа, контекст продукта, API contract, документация
+alwaysApply: true
+---
+
+# ESC-Admin — project overview
+
+Vendor-side admin для линейки Регпоинт. Клиент: ESC-Promo (коробка). Активация offline-first.
+
+## Маршрут сессии
+
+1. `CURSOR_CONTEXT.md`
+2. `docs/active/DOCUMENTATION_INDEX.md`
+3. **`docs/active/DEVELOPER_HANDBOOK.md`** — фактическое состояние кода (§0 quick lookup)
+4. По задаче: `VENDOR_ADMIN_SPEC.md` §8 / `VENDOR_INTEGRATION.md` / sprint docs
+
+## API contract (always)
+
+| Система | Канон | Правило |
+|---------|-------|---------|
+| Vendor-admin REST | `docs/active/VENDOR_ADMIN_SPEC.md` §8 | **источник истины — реализуй строго по контракту** |
+| Коробка ESC-Promo | `docs/reference/esc-promo/API_CONTRACT.md` | read-only референс; **не смешивать** с admin API |
+
+- Envelope, коды ошибок, поля — по §8 admin spec. При расхождении с кодом — править код под контракт, не контракт «под код» без явной задачи.
+- Money: decimal strings `"180000.00"`; dates: ISO 8601 UTC (см. `typescript-standards.mdc`).
+
+## Жёсткие границы
+
+- **`docs/reference/esc-promo/`** — read-only копии из ESC-Promo; не править локально (`reference-boundary.mdc`)
+- Только в ESC-Promo (не копируем): `SUPPORT_CHAT.md`, `BUSINESS_MODEL.md`, `PRODUCT_LINE.md`
+- Admin specs и handbook — **`docs/active/`**; референс коробки — только `docs/reference/esc-promo/`
+
+## Продукт и trust model
+
+Regpoint Vendor Admin — sales registry, price lists, activation codes, support inbox.
+
+1. Box activates locally with signed code + `LICENSE_PUBLIC_KEY`.
+2. Vendor-admin holds `LICENSE_PRIVATE_KEY`; never ships to client image.
+3. Online verify-code optional (3s timeout); failure must not block activate.
+4. Per-instance `X-Instance-Token` at instance create; display once.
+
+## Monorepo
+
+```
+packages/license-signing
+apps/api          # Express /api/v1
+apps/web          # React SPA
+```
+
+## Design tokens
+
+- Primary `#243954`, accent `#e1eff2`, sidebar 240px, radius 8px
+- Fonts: Ubuntu (headings), Times New Roman / system (body)
+
+## Docs maintenance
+
+- Новый ключевой doc → `DOCUMENTATION_INDEX.md` + `CURSOR_CONTEXT.md`; имя `SCREAMING_SNAKE.md` в `docs/active/`
+- После изменения кода → обновить `DEVELOPER_HANDBOOK.md` (§2–§5, §10); handbook фиксирует **фактическое состояние**, не дублирует §8 целиком
+
+## Generation order
+
+Chunk plan: `VENDOR_ADMIN_SPEC.md` §18; после чанка — `pnpm test:run`.

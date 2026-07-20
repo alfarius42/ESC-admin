@@ -12,6 +12,7 @@
     "db:seed-dev": "tsx scripts/seed-dev-instance.ts"
   },
   "dependencies": {
+    "@esc-admin/license-signing": "workspace:*",
     "bcryptjs": "^3.0.2",
     "dotenv": "^17.2.2",
     "drizzle-orm": "^0.44.2",

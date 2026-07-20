@@ -52,5 +52,8 @@ export const env = {
       ? hashedFromEnv
       : plainToken
         ? sha256Hex(plainToken)
-        : sha256Hex(fallbackPlainToken)
+        : sha256Hex(fallbackPlainToken),
+  licensePrivateKey: process.env.LICENSE_PRIVATE_KEY ?? "",
+  licensePublicKey: process.env.LICENSE_PUBLIC_KEY ?? "",
+  codesEncryptionKey: process.env.CODES_ENCRYPTION_KEY ?? ""
 };

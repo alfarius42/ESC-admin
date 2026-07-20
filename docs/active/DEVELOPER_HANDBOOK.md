@@ -1,9 +1,9 @@
 # Developer Handbook — ESC-Admin (Regpoint Vendor Admin)
 
-> **Статус:** актуально на 2026-06-29 (Chunk 0–4: auth, customers, instances, sales).  
+> **Статус:** актуально на 2026-07-20 (Chunk 0–5: auth, customers, instances, sales, price lists; pilot eligibility prep).  
 > **Аудитория:** разработчик поддержки, новый участник команды, ИИ-агент в Cursor.  
 > **Канон продукта:** [`VENDOR_ADMIN_SPEC.md`](VENDOR_ADMIN_SPEC.md) · **Скелетон:** [`ADMIN_SKELETON_SPEC.md`](ADMIN_SKELETON_SPEC.md) · **Интеграция с коробкой:** [`VENDOR_INTEGRATION.md`](VENDOR_INTEGRATION.md)  
-> **Правило поддержки:** [`.cursor/rules/documentation.mdc`](../../.cursor/rules/documentation.mdc) (always apply)
+> **Правило поддержки:** [`.cursor/rules/project-overview.mdc`](../../.cursor/rules/project-overview.mdc) (always apply)
 
 ---
 
@@ -44,6 +44,8 @@
 | Instances CRUD + rotate-token | `apps/api/src/modules/instances/instancesRoutes.ts` |
 | Box sales CRUD + stats | `apps/api/src/modules/boxSales/boxSalesRoutes.ts` |
 | Upsell sales CRUD + stats | `apps/api/src/modules/upsellSales/upsellSalesRoutes.ts` |
+| Price lists + import-canon | `apps/api/src/modules/priceLists/priceListsRoutes.ts` |
+| Pilot eligibility check | `apps/api/src/modules/pilot/pilotRoutes.ts` |
 | SKU catalog constants | `apps/api/src/modules/sales/skuCatalog.ts` |
 | Проверка token hash (re-export) | `apps/api/src/db/instancesRepository.ts` |
 | Парсинг env | `apps/api/src/config/environment.ts` |
@@ -63,7 +65,8 @@
 | Граница admin ↔ коробка | `docs/active/ADMIN_SKELETON_SPEC.md` §2–§3 |
 | API коробки (reference) | `docs/reference/esc-promo/API_CONTRACT.md` |
 | Backlog чанков (чеклист) | `docs/active/TODO.md` |
-| Активный спринт | `docs/active/TODO.md` § Chunk 5 |
+| Активный спринт | `docs/active/TODO.md` § Chunk 6 |
+| Внедрение цен 2026 + pilot guard | `docs/active/IMPLEMENTATION_PRICE_POLICY_PILOT.md` |
 | Sprint 3 (закрыт) | `docs/active/IMPLEMENTATION_SPRINT_3.md` |
 | Sprint 2 (закрыт) | `docs/active/IMPLEMENTATION_SPRINT_2.md` |
 | Sprint 1 (закрыт) | `docs/active/IMPLEMENTATION_NEAREST_TASKS.md` |
@@ -134,6 +137,8 @@ ESC-Admin/
 | `src/modules/instances/*` | Instances CRUD, token lifecycle | Chunk 3 |
 | `src/modules/boxSales/*` | Box sales CRUD + stats | Chunk 4 |
 | `src/modules/upsellSales/*` | Upsell sales CRUD + stats | Chunk 4 |
+| `src/modules/priceLists/*` | Price lists CRUD + publish + import-canon | Chunk 5 |
+| `src/modules/pilot/*` | Pilot eligibility anti-abuse checks | Chunk 5 (prep for Chunk 6) |
 | `src/modules/sales/skuCatalog.ts` | Package/upsell SKU constants | Chunk 4 |
 | `src/utils/pagination.ts` | List pagination helpers | Chunk 2 |
 | `src/db/instancesRepository.ts` | Re-export token lookup для integrations | Chunk 3 |
@@ -145,6 +150,9 @@ ESC-Admin/
 | `tests/instancesService.test.ts` | createInstanceRecord pending-hash / display-once | — |
 | `tests/boxSales.integration.test.ts` | Box sales routes | — |
 | `tests/upsellSales.integration.test.ts` | Upsell sales routes | — |
+| `tests/priceLists.integration.test.ts` | Price lists routes | — |
+| `tests/canonCatalog.test.ts` | Price canon (2026 policy) | — |
+| `tests/pilotEligibility.test.ts` | Pilot anti-abuse rules | — |
 | `Dockerfile` | Container image API | `docker-compose.yml` |
 
 **Зависимости между слоями API:**
@@ -254,7 +262,7 @@ parseActivationEnvelope(code)  →  ParsedActivationEnvelope (dot / JSON variant
 ## 3. API — реализовано vs planned
 
 > **Канон полного admin API:** [`VENDOR_ADMIN_SPEC.md`](VENDOR_ADMIN_SPEC.md) §8.  
-> Ниже — **фактическое состояние кода** на Chunk 3.
+> Ниже — **фактическое состояние кода** на Chunk 5.
 
 | Method | Path | Статус | Модуль | Примечание |
 |--------|------|--------|--------|------------|
@@ -283,6 +291,18 @@ parseActivationEnvelope(code)  →  ParsedActivationEnvelope (dot / JSON variant
 | GET | `/api/v1/upsell-sales/:id` | **implemented** | `modules/upsellSales/` | detail |
 | PATCH | `/api/v1/upsell-sales/:id` | **implemented** | `modules/upsellSales/` | partial update |
 | GET | `/api/v1/upsell-sales/stats` | **implemented** | `modules/upsellSales/` | count/revenue/byCategory/bySku |
+| GET | `/api/v1/price-lists` | **implemented** | `modules/priceLists/` | list + pagination |
+| POST | `/api/v1/price-lists` | **implemented** | `modules/priceLists/` | create draft |
+| GET | `/api/v1/price-lists/:id` | **implemented** | `modules/priceLists/` | detail + `items[]` |
+| PATCH | `/api/v1/price-lists/:id` | **implemented** | `modules/priceLists/` | editable only in draft |
+| POST | `/api/v1/price-lists/:id/publish` | **implemented** | `modules/priceLists/` | single published at a time |
+| POST | `/api/v1/price-lists/:id/items` | **implemented** | `modules/priceLists/` | add item to draft |
+| PATCH | `/api/v1/price-lists/:id/items/:itemId` | **implemented** | `modules/priceLists/` | patch item |
+| DELETE | `/api/v1/price-lists/:id/items/:itemId` | **implemented** | `modules/priceLists/` | remove item |
+| POST | `/api/v1/price-lists/import-canon` | **implemented** | `modules/priceLists/` | imports 28+ canonical SKUs |
+| GET | `/api/v1/price-lists/current` | **implemented** | `modules/priceLists/` | current published list |
+| GET | `/api/v1/customers/:customerId/pilot-eligibility` | **implemented** | `modules/pilot/` | anti-abuse precheck for pilot |
+| POST | `/api/v1/licenses/:id/codes` | **partial** | `modules/licenses/` | issues signed/encrypted code, enforces §7.3 matrix + pilot eligibility, writes audit log; pending: switch signer to `license-signing` export |
 | POST | `/api/v1/integrations/verify-code` | **stub 501** | `routes/integrations.ts` | Chunk 7 |
 | POST | `/api/v1/integrations/support/messages` | **stub 501** | `routes/integrations.ts` | Chunk 7 |
 
@@ -467,8 +487,9 @@ corepack pnpm smoke        # scripts/smoke.ps1
 | [`GIT_WORKFLOW.md`](GIT_WORKFLOW.md) | `feature/*` → PR → `develop` → `main` |
 | [`GITHUB_RULES.md`](GITHUB_RULES.md) | Branch protection, required checks |
 | [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml) | Trigger: push `feature/**`, `develop`; PR → `develop`, `main` |
-| [`.cursor/rules/development-process.mdc`](../../.cursor/rules/development-process.mdc) | Docs-first |
-| [`.cursor/rules/documentation.mdc`](../../.cursor/rules/documentation.mdc) | Handbook maintenance (always apply) |
+| [`.cursor/rules/project-overview.mdc`](../../.cursor/rules/project-overview.mdc) | Контекст, API contract, docs index |
+| [`.cursor/rules/reference-boundary.mdc`](../../.cursor/rules/reference-boundary.mdc) | Read-only референс ESC-Promo |
+| [`.cursor/rules/typescript-standards.mdc`](../../.cursor/rules/typescript-standards.mdc) | TS, envelope, license signing |
 
 **Quality gates (после Chunk 0):** `check:no-any` → `test:run` → `build`.
 
@@ -504,7 +525,7 @@ corepack pnpm smoke        # scripts/smoke.ps1
 
 ## 10. Roadmap
 
-Полный backlog: [`TODO.md`](TODO.md) · последний спринт: [`IMPLEMENTATION_SPRINT_3.md`](IMPLEMENTATION_SPRINT_3.md).
+Полный backlog: [`TODO.md`](TODO.md) · последний completed спринт: [`IMPLEMENTATION_SPRINT_3.md`](IMPLEMENTATION_SPRINT_3.md) · актуальное внедрение цен/пилота: [`IMPLEMENTATION_PRICE_POLICY_PILOT.md`](IMPLEMENTATION_PRICE_POLICY_PILOT.md).
 
 | Chunk | Название | Статус в коде | Ключевые артеfacts |
 |:-----:|----------|:-------------:|---------------------|
@@ -513,7 +534,9 @@ corepack pnpm smoke        # scripts/smoke.ps1
 | 2 | API: config, db, auth | **implemented** | JWT auth, phased Drizzle adoption (`db/schema.ts`, `getDrizzleDb`), `001_initial.sql` |
 | 3 | customers, instances | **implemented** | CRUD, token display-once, rotate |
 | 4 | boxSales, upsellSales, web shell | **implemented** | sales API + operator UI |
-| 5–12 | pricing, codes, support, audit | planned | см. `VENDOR_ADMIN_SPEC.md` §18 |
+| 5 | price lists + import-canon + pricing policy 2026 | **implemented** | `modules/priceLists/*`, `canonCatalog.ts`, `priceLists.integration.test.ts` |
+| 6 | licenses, codes (issue + verify) | planned (pilot precheck ready) | `modules/pilot/*` + `license-signing` |
+| 7–12 | dashboard, public API, support, audit, docs | planned | см. `VENDOR_ADMIN_SPEC.md` §18 |
 
 > **Примечание:** [`TODO.md`](TODO.md) — чеклист backlog с `[ ]`/`[x]`; сводная таблица там может отставать. **Источник истины по коду** — §2–§3 этого handbook.
 
@@ -541,10 +564,11 @@ corepack pnpm smoke        # scripts/smoke.ps1
 | [`DOCUMENTATION_INDEX.md`](DOCUMENTATION_INDEX.md) | Полный список docs |
 | [`CURSOR_CONTEXT.md`](../../CURSOR_CONTEXT.md) | Лёгкий индекс для агента |
 | [`AGENTS.md`](../../AGENTS.md) | Контекст Cursor: чанки, git, handbook |
-| [`.cursor/rules/documentation.mdc`](../../.cursor/rules/documentation.mdc) | Always apply: поддержка handbook |
+| [`.cursor/rules/project-overview.mdc`](../../.cursor/rules/project-overview.mdc) | Always apply: контекст, API contract, handbook |
 | [`VENDOR_ADMIN_SPEC.md`](VENDOR_ADMIN_SPEC.md) | Полное ТЗ, API §8, SQL, UI |
 | [`ADMIN_SKELETON_SPEC.md`](ADMIN_SKELETON_SPEC.md) | Chunk 0, граница API |
 | [`VENDOR_INTEGRATION.md`](VENDOR_INTEGRATION.md) | Token, verify-code, deploy |
+| [`IMPLEMENTATION_PRICE_POLICY_PILOT.md`](IMPLEMENTATION_PRICE_POLICY_PILOT.md) | Фактические цены 2026, pilot anti-abuse, runbook |
 | [`docs/reference/esc-promo/`](../reference/esc-promo/) | Референс коробки |
 
 ---

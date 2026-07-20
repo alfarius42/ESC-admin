@@ -10,6 +10,9 @@ importers:
 
   apps/api:
     dependencies:
+      '@esc-admin/license-signing':
+        specifier: workspace:*
+        version: link:../../packages/license-signing
       bcryptjs:
         specifier: ^3.0.2
         version: 3.0.3

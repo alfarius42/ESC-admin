@@ -1,0 +1,20 @@
+---
+description: Запрет правки read-only референса ESC-Promo
+alwaysApply: true
+---
+
+# Граница docs/reference/esc-promo
+
+Read-only снимки продукта ESC-Promo.
+
+## Запрещено
+
+- Редактировать файлы в `docs/reference/esc-promo/` для фикса admin-логики
+- Использовать reference как канон admin API
+
+## Разрешено
+
+- Читать для интеграции (activate, license format, trust boundary)
+- Синхронизировать из `C:\ESC-Promo\docs\active\` по `docs/reference/esc-promo/README.md`
+
+Admin API канон — `docs/active/VENDOR_ADMIN_SPEC.md` §8 (`project-overview.mdc`).

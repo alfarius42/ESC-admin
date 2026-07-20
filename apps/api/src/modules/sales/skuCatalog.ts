@@ -15,26 +15,27 @@ export type UpsellCatalogEntry = {
     | "other";
   title: string;
   listPriceRub: string | null;
+  priceNote?: string | null;
 };
 
 export const PACKAGE_CATALOG: Record<string, PackageCatalogEntry> = {
   "PKG-POINT": {
     packageSlug: "regpoint_point",
     modules: ["point"],
-    listPriceRub: "100000.00",
+    listPriceRub: "50000.00",
     title: "Рег.Поинт — лицензия"
   },
   "PKG-PROMO": {
     packageSlug: "regpoint_promo",
     modules: ["promo"],
-    listPriceRub: null,
+    listPriceRub: "50000.00",
     title: "Рег.Промо — лицензия"
   },
   "PKG-PRO": {
     packageSlug: "regpoint_pro",
     modules: ["pro"],
-    listPriceRub: "180000.00",
-    title: "Рег.Про — лицензия"
+    listPriceRub: "80000.00",
+    title: "Промо.Про — лицензия"
   },
   "PKG-TICKET": {
     packageSlug: "regpoint_ticket",
@@ -47,13 +48,13 @@ export const PACKAGE_CATALOG: Record<string, PackageCatalogEntry> = {
 export const UPSELL_CATALOG: Record<string, UpsellCatalogEntry> = {
   "LIC-UP-PRO-POINT": {
     skuCategory: "license_upgrade",
-    title: "Рег.Поинт → Рег.Про",
-    listPriceRub: "80000.00"
+    title: "Рег.Поинт → Промо.Про",
+    listPriceRub: "30000.00"
   },
   "LIC-UP-PRO-PROMO": {
     skuCategory: "license_upgrade",
-    title: "Рег.Промо → Рег.Про",
-    listPriceRub: null
+    title: "Рег.Промо → Промо.Про",
+    listPriceRub: "30000.00"
   },
   "LIC-UP-PROMO": {
     skuCategory: "license_upgrade",
@@ -72,13 +73,37 @@ export const UPSELL_CATALOG: Record<string, UpsellCatalogEntry> = {
   },
   "BOX-DEP-02": {
     skuCategory: "deploy",
-    title: "Turnkey деплой",
-    listPriceRub: "45000.00"
+    title: "Внедрение (базовый функционал, развертывание, обучение)",
+    listPriceRub: "12000.00"
   },
   "BOX-SSL-01": {
     skuCategory: "deploy",
     title: "HTTPS Let's Encrypt",
     listPriceRub: "12000.00"
+  },
+  "BOX-FNS-01": {
+    skuCategory: "deploy",
+    title: "Пакет заявки ФНС (API)",
+    listPriceRub: null,
+    priceNote: "включено в Промо.Про"
+  },
+  "DEV-FIELD": {
+    skuCategory: "dev",
+    title: "Кастомизация — кастомное поле",
+    listPriceRub: "20000.00",
+    priceNote: "от 20000, зависит от конкретного функционала"
+  },
+  "DEV-REPORT": {
+    skuCategory: "dev",
+    title: "Кастомизация — кастомный отчёт",
+    listPriceRub: "20000.00",
+    priceNote: "от 20000, зависит от конкретного функционала"
+  },
+  "INT-CRM": {
+    skuCategory: "dev",
+    title: "Интеграция CRM",
+    listPriceRub: null,
+    priceNote: "включено в Промо.Про"
   },
   "SUP-TRAIN-2": {
     skuCategory: "support",
