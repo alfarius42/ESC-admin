@@ -26,7 +26,7 @@
 | 11 | audit log, support e2e | ⬜ |
 | 12 | README, интеграционная документация | ⬜ |
 
-**Текущая фаза репо:** Chunk 5 закрыт (price lists + import-canon + pricing policy 2026). Следующий — Chunk 6 (licenses/codes, с подключением pilot-eligibility).
+**Текущая фаза репо:** Chunk 6 закрыт (licenses CRUD + issue/verify/list). Следующий — Chunk 7 (dashboard, integration/public/support API).
 
 ---
 
@@ -254,10 +254,10 @@
 
 ### 6.1 Licenses module
 
-- [ ] `GET /licenses` — filters (customerId, instanceId, status)
-- [ ] `POST /licenses` — link boxSaleId or instanceId
-- [ ] `GET /licenses/:id` — license + codes (masked) + history
-- [ ] `PATCH /licenses/:id` — status, validUntil, modules
+- [x] `GET /licenses` — filters (customerId, instanceId, status)
+- [x] `POST /licenses` — link boxSaleId or instanceId
+- [x] `GET /licenses/:id` — license + codes (masked) + history
+- [x] `PATCH /licenses/:id` — status, validUntil, modules
 
 ### 6.2 Codes module (issue)
 
@@ -266,20 +266,20 @@
 - [x] Базовый issue flow: `POST /licenses/:id/codes` возвращает `201`, `activationCode`, `displayOnce`, `emailTemplate`; код сохраняется encrypted в `activation_codes`
 - [x] Validation rules §7.3 (duplicate initial blocked, addon merge rules, etc.)
 - [x] Сроки §7.4: initial/renewal 365d, pilot 30d
-- [ ] Sign через `license-signing` package export (`signPayload`) §7.6
+- [x] Sign через `license-signing` package export (`signPayload`) §7.6
 - [x] Encrypt at rest (`activation_code_encrypted`, AES-256-GCM) §7.6
 - [x] Audit log на `CODE_ISSUED` и `CODE_ISSUE_BLOCKED`
-- [ ] Response: full code **display once** + summary для support
-- [ ] `POST /codes/verify` (admin UI) — parse, verify, lookup, warnings §7.5
-- [ ] `GET /codes` — без full code, только hash prefix + metadata
+- [x] Response: full code **display once** + summary для support (`displayOnce`, `emailTemplate`)
+- [x] `POST /codes/verify` (admin UI) — parse, verify, lookup, warnings §7.5
+- [x] `GET /codes` — без full code, только hash prefix + metadata
 
 ### 6.3 Тесты
 
-- [ ] `codes.integration.test.ts`:
-  - [ ] issue initial
-  - [ ] verify valid
-  - [ ] duplicate initial blocked
-- [ ] `pnpm test:run` — green
+- [x] `codes.integration.test.ts`:
+  - [x] issue initial
+  - [x] verify valid
+  - [x] duplicate initial blocked
+- [x] `pnpm test:run` — green
 
 ---
 

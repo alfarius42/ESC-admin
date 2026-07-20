@@ -302,7 +302,13 @@ parseActivationEnvelope(code)  →  ParsedActivationEnvelope (dot / JSON variant
 | POST | `/api/v1/price-lists/import-canon` | **implemented** | `modules/priceLists/` | imports 28+ canonical SKUs |
 | GET | `/api/v1/price-lists/current` | **implemented** | `modules/priceLists/` | current published list |
 | GET | `/api/v1/customers/:customerId/pilot-eligibility` | **implemented** | `modules/pilot/` | anti-abuse precheck for pilot |
-| POST | `/api/v1/licenses/:id/codes` | **partial** | `modules/licenses/` | issues signed/encrypted code, enforces §7.3 matrix + pilot eligibility, writes audit log; pending: switch signer to `license-signing` export |
+| GET | `/api/v1/licenses` | **implemented** | `modules/licenses/` | filters: `customerId`, `instanceId`, `status` + pagination |
+| POST | `/api/v1/licenses` | **implemented** | `modules/licenses/` | create draft license, link `boxSaleId` or explicit `instanceId` |
+| GET | `/api/v1/licenses/:id` | **implemented** | `modules/licenses/` | detail + masked codes + audit history |
+| PATCH | `/api/v1/licenses/:id` | **implemented** | `modules/licenses/` | update `licenseStatus`, `validUntil`, `modules` |
+| POST | `/api/v1/licenses/:id/codes` | **implemented** | `modules/licenses/` | issue signed/encrypted code, §7.3 matrix + pilot eligibility, atomic audit |
+| GET | `/api/v1/codes` | **implemented** | `modules/licenses/` | masked list: hash prefix + metadata, no full code |
+| POST | `/api/v1/codes/verify` | **implemented** | `modules/licenses/` | parse + verify via `license-signing`, DB lookup, warnings §7.5 |
 | POST | `/api/v1/integrations/verify-code` | **stub 501** | `routes/integrations.ts` | Chunk 7 |
 | POST | `/api/v1/integrations/support/messages` | **stub 501** | `routes/integrations.ts` | Chunk 7 |
 
@@ -535,7 +541,7 @@ corepack pnpm smoke        # scripts/smoke.ps1
 | 3 | customers, instances | **implemented** | CRUD, token display-once, rotate |
 | 4 | boxSales, upsellSales, web shell | **implemented** | sales API + operator UI |
 | 5 | price lists + import-canon + pricing policy 2026 | **implemented** | `modules/priceLists/*`, `canonCatalog.ts`, `priceLists.integration.test.ts` |
-| 6 | licenses, codes (issue + verify) | planned (pilot precheck ready) | `modules/pilot/*` + `license-signing` |
+| 6 | licenses, codes (issue + verify) | **partial** (6.1 licenses CRUD pending) | `modules/licenses/*`, `modules/pilot/*` |
 | 7–12 | dashboard, public API, support, audit, docs | planned | см. `VENDOR_ADMIN_SPEC.md` §18 |
 
 > **Примечание:** [`TODO.md`](TODO.md) — чеклист backlog с `[ ]`/`[x]`; сводная таблица там может отставать. **Источник истины по коду** — §2–§3 этого handbook.

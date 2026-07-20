@@ -118,7 +118,7 @@
 Оставшиеся шаги для полного Chunk 6:
 
 1. Перевести подпись на прямое использование `packages/license-signing` (`signPayload`) в сервисе выдачи
-2. Добавить `GET /codes` и `POST /codes/verify` (admin verify flow §7.5)
+2. ~~Добавить `GET /codes` и `POST /codes/verify` (admin verify flow §7.5)~~ — **done** (`licenseCodesListService`, `licenseCodesVerifyService`)
 
 ---
 
